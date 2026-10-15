@@ -1,0 +1,144 @@
+{
+  "artifacts": {
+    "model_dir": "/root/private_data/thousand_model/models/glm45_air_105b_spec",
+    "config_path": "/root/private_data/thousand_model/models/glm45_air_105b_spec/config.json",
+    "weight_files": [
+      "/root/private_data/thousand_model/models/glm45_air_105b_spec/model-00000-placeholder.safetensors"
+    ],
+    "tokenizer_files": [],
+    "shard_count": 1,
+    "weight_format": "safetensors"
+  },
+  "model_spec": {
+    "model_dir": "/root/private_data/thousand_model/models/glm45_air_105b_spec",
+    "model_type": "glm4_moe",
+    "architecture": "Glm4MoeForCausalLM",
+    "hidden_size": 4096,
+    "intermediate_size": 10944,
+    "num_layers": 46,
+    "num_heads": 96,
+    "num_kv_heads": 8,
+    "vocab_size": 151552,
+    "max_seq_len": 40960,
+    "rope_theta": 1000000.0,
+    "rms_norm_eps": 1e-05,
+    "tie_word_embeddings": false,
+    "source_torch_dtype": "bfloat16",
+    "estimated_total_params": 112101019648,
+    "estimated_params_per_layer": 2409989164,
+    "head_dim": 128,
+    "partial_rotary_factor": 0.5,
+    "num_experts": 128,
+    "num_experts_per_tok": 8,
+    "moe_intermediate_size": 1408,
+    "shared_expert_intermediate_size": 10944,
+    "first_k_dense_replace": 1,
+    "num_nextn_predict_layers": 1
+  },
+  "environment": {
+    "accelerator_type": "hip",
+    "device_count": 16,
+    "devices": [
+      {
+        "index": 0,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 1,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 2,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 3,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 4,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 5,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 6,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 7,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 8,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 9,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 10,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 11,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 12,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 13,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 14,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 15,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      }
+    ],
+    "primary_device_name": "BW",
+    "primary_device_memory_bytes": 68719476736,
+    "torch_version": "2.7.1",
+    "hip_version": "6.3.26093"
+  }
+}

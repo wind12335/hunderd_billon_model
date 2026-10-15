@@ -1,0 +1,120 @@
+{
+  "style": "megatron_standard",
+  "execution_mode": "current_feasible",
+  "model_dir": "/root/private_data/thousand_model/model/Llama-3.1-8B",
+  "model_type": "llama",
+  "architecture": "LlamaForCausalLM",
+  "parallelism": {
+    "dp_size": 4,
+    "tp_size": 4,
+    "pp_size": 1,
+    "expert_model_parallel_size": 1,
+    "world_size": 16,
+    "sequence_parallel": true
+  },
+  "parallel_plan": {
+    "model_path": "/root/private_data/thousand_model/model/Llama-3.1-8B",
+    "tp": 4,
+    "dp": 4,
+    "pp": 1,
+    "ep": 1,
+    "mesh": {
+      "tp": 4,
+      "dp": 4
+    },
+    "world_size": 16,
+    "attention_policy": "head_shard",
+    "mlp_policy": "colrow_shard",
+    "attention_policy_front": "head_shard",
+    "attention_policy_mid": "head_shard",
+    "attention_policy_back": "head_shard",
+    "mlp_policy_front": "colrow_shard",
+    "mlp_policy_mid": "colrow_shard",
+    "mlp_policy_back": "colrow_shard",
+    "embedding_policy": "vocab_shard",
+    "lm_head_policy": "vocab_shard",
+    "sequence_parallel": true,
+    "micro_batch_size": 1,
+    "global_batch_size": 4,
+    "parallel_mode": "MODEL_PARALLEL",
+    "execution_mode": "current_feasible",
+    "strategy_name": "BLOCK_LEVEL_FAST",
+    "strategy_policy": "BALANCED",
+    "search_time_seconds": 0.002173788845539093,
+    "estimated_memory_bytes": 32894649630,
+    "memory_margin_bytes": 30327268967,
+    "fits_current_environment": true,
+    "requires_additional_devices": 0,
+    "megatron_lowerable": true,
+    "notes": [
+      "mesh=tp=4,dp=4,pp=1",
+      "proposal=tp=4,dp=4,pp=1|attn=(head_shard,head_shard,head_shard)|mlp=(colrow_shard,colrow_shard,colrow_shard)|emb=vocab_shard|head=vocab_shard",
+      "pp=1,ep=1"
+    ]
+  },
+  "train": {
+    "micro_batch_size": 1,
+    "global_batch_size": 4,
+    "seq_length": 4096,
+    "precision": "bf16",
+    "use_distributed_optimizer": true,
+    "use_activation_recompute": true
+  },
+  "environment": {
+    "detected_device_count": 16,
+    "device_name": "BW",
+    "device_memory_bytes": 68719476736,
+    "accelerator_type": "hip",
+    "hip_version": "6.3.26093"
+  },
+  "search": {
+    "strategy_name": "BLOCK_LEVEL_FAST",
+    "strategy_policy": "BALANCED",
+    "planning_device_count": 16,
+    "search_time_seconds": 0.002173788845539093,
+    "benchmarks": [
+      {
+        "strategy_name": "BLOCK_LEVEL_FAST",
+        "strategy_policy": "BALANCED",
+        "elapsed_seconds": 0.002173788845539093,
+        "feasible_current_count": 12,
+        "scalable_future_count": 24
+      },
+      {
+        "strategy_name": "HIERARCHICAL",
+        "strategy_policy": "BALANCED",
+        "elapsed_seconds": 0.002041978994384408,
+        "feasible_current_count": 12,
+        "scalable_future_count": 24
+      }
+    ]
+  },
+  "model": {
+    "hidden_size": 4096,
+    "intermediate_size": 14336,
+    "num_layers": 32,
+    "num_heads": 32,
+    "num_kv_heads": 8,
+    "vocab_size": 128256,
+    "max_seq_len": 131072,
+    "rope_theta": 500000.0,
+    "rms_norm_eps": 1e-05,
+    "tie_word_embeddings": false,
+    "estimated_total_params": 8030261248,
+    "is_moe": false,
+    "head_dim": null,
+    "num_experts": 0,
+    "num_experts_per_tok": 0,
+    "moe_intermediate_size": null,
+    "shared_expert_intermediate_size": null,
+    "first_k_dense_replace": 0,
+    "num_nextn_predict_layers": 0
+  },
+  "search_notes": [
+    "搜索域覆盖 DP + TP + PP（MoE 模型额外包含 EP 候选）。",
+    "显存过滤使用 block-level 粗估，并假设开启激活重计算。",
+    "选定搜索策略 BLOCK_LEVEL_FAST，策略偏好 BALANCED，耗时 0.0022 秒。",
+    "最终显式 ParallelPlan: TP=4, DP=4, PP=1, EP=1, attention=head_shard, mlp=colrow_shard, embedding=vocab_shard, lm_head=vocab_shard。",
+    "三段式策略: attn(front/mid/back)=(head_shard,head_shard,head_shard), mlp(front/mid/back)=(colrow_shard,colrow_shard,colrow_shard)。"
+  ]
+}

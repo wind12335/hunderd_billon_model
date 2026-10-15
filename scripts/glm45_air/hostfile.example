@@ -1,0 +1,5 @@
+# GLM-4.5-Air 多机 hostfile 示例。
+# 每行一个节点主机名（或 IP），第一行是主节点（NODE_RANK=0 / MASTER_ADDR）。
+# 把下面两行替换成真实双机的主机名；128 卡集群准备 16 行。
+node-01
+node-02

@@ -1,0 +1,40 @@
+# Copyright (c) 2026, HYGON-AI. All rights reserved.
+#
+# Reusable test-execution action (mirrors upstream .github/actions):
+# env-check -> workspace prepare -> run test script -> cleanup.
+# Artifact upload is intentionally omitted: the shared org storage quota
+# would otherwise fail every run once full (see #13).
+name: Run HCU test
+description: Run a repo test script inside the configured HCU container
+
+inputs:
+  test_script:
+    description: Repository-relative path of the test script to execute
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check environment
+      shell: bash
+      run: |
+        set -euo pipefail
+        bash tests/bw1100/ci/check_environment.sh
+
+    - name: Prepare workspace and run test
+      shell: bash
+      env:
+        TEST_SCRIPT: ${{ inputs.test_script }}
+      run: |
+        set -euo pipefail
+        export DAS_HCU_CI_LOG_DIR="${DAS_HCU_CI_LOG_DIR:-ci-logs/run}"
+        mkdir -p "${DAS_HCU_CI_LOG_DIR}"
+        source tests/bw1100/ci/prepare_workspace.sh
+        bash "${TEST_SCRIPT}" 2>&1 | tee -a "${DAS_HCU_CI_LOG_DIR}/test.log"
+        exit "${PIPESTATUS[0]}"
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      run: |
+        bash tests/bw1100/ci/cleanup.sh || true

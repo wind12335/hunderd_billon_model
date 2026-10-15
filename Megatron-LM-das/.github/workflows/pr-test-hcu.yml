@@ -1,0 +1,336 @@
+# Copyright (c) 2026, HYGON-AI. All rights reserved.
+
+name: PR Test (HCU)
+
+on:
+  pull_request_target:
+    branches:
+      - core_v0.18.2
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  workflow_dispatch:
+
+concurrency:
+  group: pr-test-hcu-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DAS_HCU_CI_RUNNER_LABEL: ${{ vars.DAS_HCU_CI_RUNNER_LABEL }}
+  DAS_HCU_CI_IMAGE: ${{ vars.DAS_HCU_CI_IMAGE }}
+  DAS_HCU_MEGATRON_WHEEL: ${{ vars.DAS_HCU_MEGATRON_WHEEL }}
+
+jobs:
+  authorize:
+    name: Authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Authorize PR source
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${EVENT_NAME}" == "pull_request_target" ]]; then
+            echo "HCU execution authorized for ${HEAD_REPOSITORY} targeting ${BASE_REPOSITORY}."
+          else
+            echo "${EVENT_NAME} run authorized."
+          fi
+
+  check-changes:
+    name: Check changes
+    needs:
+      - authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      runtime: ${{ steps.resolve.outputs.runtime }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Classify changed paths
+        id: changes
+        if: github.event_name == 'pull_request_target'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${BASE_SHA}" ]]; then
+            BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+          else
+            git remote remove ci-base 2>/dev/null || true
+            git remote add ci-base "https://github.com/${BASE_REPOSITORY}.git"
+            git fetch --no-tags ci-base \
+              "+refs/heads/${BASE_REF}:refs/remotes/ci-base/${BASE_REF}"
+            git cat-file -e "${BASE_SHA}^{commit}"
+          fi
+
+          merge_base="$(git merge-base "${BASE_SHA}" "${HEAD_SHA}")"
+          if [[ -z "${merge_base}" ]]; then
+            echo "ERROR: no merge base between ${BASE_SHA} and ${HEAD_SHA}" >&2
+            exit 1
+          fi
+
+          runtime=true
+          non_docs=false
+          while IFS= read -r path; do
+            [[ -z "${path}" ]] && continue
+            case "${path}" in
+              docs/*|*.md|.github/CI-README.md) ;;
+              *) non_docs=true ;;
+            esac
+          done < <(git diff --name-only "${merge_base}" "${HEAD_SHA}")
+
+          if [[ "${non_docs}" == "false" ]]; then
+            runtime=false
+            echo "Docs-only change; tests skipped."
+          fi
+          echo "runtime=${runtime}" | tee -a "${GITHUB_OUTPUT}"
+
+      - name: Force runtime on manual dispatch
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "runtime=true" | tee -a "${GITHUB_OUTPUT}"
+
+      - name: Resolve runtime flag
+        id: resolve
+        shell: bash
+        env:
+          PR_RUNTIME: ${{ steps.changes.outputs.runtime }}
+          MANUAL_RUNTIME: ${{ steps.manual.outputs.runtime }}
+        run: |
+          if [[ "${MANUAL_RUNTIME}" == "true" || "${PR_RUNTIME}" == "true" ]]; then
+            echo "runtime=true" | tee -a "${GITHUB_OUTPUT}"
+          else
+            echo "runtime=false" | tee -a "${GITHUB_OUTPUT}"
+          fi
+
+  linting:
+    name: Linting
+    needs:
+      - authorize
+      - check-changes
+    if: needs.check-changes.outputs.runtime == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: false
+
+      - name: Bash syntax check
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          for script in tests/bw1100/**/*.sh tests/unit_tests/run_ci_test.sh; do
+            [[ -f "${script}" ]] && bash -n "${script}"
+          done
+
+      - name: Python compile check
+        shell: bash
+        run: python3 -m compileall -q hcu_megatron tests/bw1100
+
+  validate-config:
+    name: Validate HCU config
+    needs:
+      - authorize
+      - check-changes
+    if: needs.check-changes.outputs.runtime == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate repository variables
+        shell: bash
+        env:
+          IMAGE: ${{ vars.DAS_HCU_CI_IMAGE }}
+          RUNNER_LABEL: ${{ vars.DAS_HCU_CI_RUNNER_LABEL }}
+        run: |
+          set -euo pipefail
+          [[ -n "${RUNNER_LABEL}" ]] || { echo "ERROR: DAS_HCU_CI_RUNNER_LABEL is not configured" >&2; exit 1; }
+          [[ "${IMAGE}" == *:* ]] || {
+            echo "ERROR: DAS_HCU_CI_IMAGE must include an explicit tag" >&2
+            exit 1
+          }
+
+  restore-before-unit:
+    name: Restore workspace before unit tests
+    needs:
+      - check-changes
+      - validate-config
+    if: needs.check-changes.outputs.runtime == 'true' && needs.validate-config.result == 'success'
+    runs-on:
+      - self-hosted
+      - hcu
+      - ${{ vars.DAS_HCU_CI_RUNNER_LABEL || 'hcu-ci-unconfigured' }}
+    timeout-minutes: 10
+    env:
+      DAS_HCU_CI_IMAGE: ${{ vars.DAS_HCU_CI_IMAGE }}
+    steps:
+      - name: Restore existing workspace ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          workspace="$(realpath -m -- "${GITHUB_WORKSPACE}")"
+          runner_temp="$(realpath -m -- "${RUNNER_TEMP}")"
+          work_root="$(dirname -- "${runner_temp}")"
+          case "${workspace}" in
+            "${work_root}"/*/*) ;;
+            *) echo "ERROR: refusing to change ownership outside ${work_root}: ${workspace}" >&2; exit 1 ;;
+          esac
+
+          owner="$(stat -c '%u:%g' -- "${runner_temp}")"
+          [[ "${owner}" =~ ^[1-9][0-9]*:[0-9]+$ ]] || {
+            echo "ERROR: unsafe runner ownership: ${owner}" >&2
+            exit 1
+          }
+
+          docker run --rm \
+            --volume "${workspace}:/workspace" \
+            "${DAS_HCU_CI_IMAGE}" \
+            chown -R -- "${owner}" /workspace
+
+  unit-tests:
+    name: Unit tests
+    needs:
+      - check-changes
+      - linting
+      - restore-before-unit
+    if: needs.check-changes.outputs.runtime == 'true'
+    runs-on:
+      - self-hosted
+      - hcu
+      - ${{ vars.DAS_HCU_CI_RUNNER_LABEL || 'hcu-ci-unconfigured' }}
+    timeout-minutes: 60
+    container:
+      image: ${{ vars.DAS_HCU_CI_IMAGE || 'invalid.local/das-hcu-unconfigured@sha256:0000000000000000000000000000000000000000000000000000000000000000' }}
+      options: >-
+        --privileged
+        --device=/dev/kfd
+        --device=/dev/mkfd
+        --device=/dev/dri
+        --group-add video
+        --cap-add=SYS_PTRACE
+        --security-opt seccomp=unconfined
+        --shm-size=64g
+        --ipc=host
+      volumes:
+        - /opt/hyhal:/opt/hyhal:ro
+    env:
+      DAS_HCU_CI_RUN_ID: unit-${{ github.run_id }}-${{ github.run_attempt }}
+      DAS_HCU_CI_LOG_DIR: ci-logs/unit-${{ github.run_id }}-${{ github.run_attempt }}
+      BUCKET: tests/unit_tests
+      N_REPEAT: "1"
+      MEGATRON_PATH: ${{ github.workspace }}/3rdparty/Megatron-LM
+      DTK_ENV: /opt/dtk/env.sh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          submodules: false
+          clean: true
+
+      - name: Install requirements
+        shell: bash
+        run: python3 -m pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple -r requirements/requirements.txt
+
+      - name: Run unit tests
+        uses: ./.github/actions/run-test
+        with:
+          test_script: tests/bw1100/pr/run_unit_tests.sh
+
+  restore-after-unit:
+    name: Restore workspace after unit tests
+    if: always() && needs.check-changes.outputs.runtime == 'true' && needs.unit-tests.result != 'skipped'
+    needs:
+      - check-changes
+      - unit-tests
+    runs-on:
+      - self-hosted
+      - hcu
+      - ${{ vars.DAS_HCU_CI_RUNNER_LABEL || 'hcu-ci-unconfigured' }}
+    timeout-minutes: 5
+    env:
+      DAS_HCU_CI_IMAGE: ${{ vars.DAS_HCU_CI_IMAGE }}
+    steps:
+      - name: Restore runner workspace ownership
+        shell: bash
+        run: bash tests/bw1100/ci/restore_runner_permissions.sh
+
+  finish:
+    name: Finish
+    if: always()
+    needs:
+      - authorize
+      - check-changes
+      - linting
+      - validate-config
+      - restore-before-unit
+      - unit-tests
+      - restore-after-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate required jobs
+        shell: bash
+        env:
+          RUNTIME_CHANGED: ${{ needs.check-changes.outputs.runtime }}
+          AUTH_RESULT: ${{ needs.authorize.result }}
+          CHECK_RESULT: ${{ needs.check-changes.result }}
+          LINT_RESULT: ${{ needs.linting.result }}
+          VALIDATE_RESULT: ${{ needs.validate-config.result }}
+          RESTORE_BEFORE_RESULT: ${{ needs.restore-before-unit.result }}
+          UNIT_RESULT: ${{ needs.unit-tests.result }}
+          RESTORE_AFTER_RESULT: ${{ needs.restore-after-unit.result }}
+        run: |
+          set -euo pipefail
+          [[ "${AUTH_RESULT}" == "success" ]]
+          [[ "${CHECK_RESULT}" == "success" ]]
+
+          if [[ "${RUNTIME_CHANGED}" == "true" ]]; then
+            [[ "${LINT_RESULT}" == "success" ]]
+            [[ "${VALIDATE_RESULT}" == "success" ]]
+            [[ "${RESTORE_BEFORE_RESULT}" == "success" ]]
+            [[ "${UNIT_RESULT}" == "success" ]]
+            [[ "${RESTORE_AFTER_RESULT}" == "success" ]]
+          else
+            [[ "${LINT_RESULT}" == "skipped" ]]
+            [[ "${VALIDATE_RESULT}" == "skipped" ]]
+            [[ "${RESTORE_BEFORE_RESULT}" == "skipped" ]]
+            [[ "${UNIT_RESULT}" == "skipped" ]]
+            [[ "${RESTORE_AFTER_RESULT}" == "skipped" ]]
+          fi
+
+          {
+            echo "## HCU PR gate"
+            echo
+            echo "- runtime changed: ${RUNTIME_CHANGED}"
+            echo "- linting: ${LINT_RESULT}"
+            echo "- unit tests: ${UNIT_RESULT}"
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -1,0 +1,816 @@
+{
+  "artifacts": {
+    "model_dir": "/root/private_data/thousand_model/models/glm45_air_105b_spec",
+    "config_path": "/root/private_data/thousand_model/models/glm45_air_105b_spec/config.json",
+    "weight_files": [
+      "/root/private_data/thousand_model/models/glm45_air_105b_spec/model-00000-placeholder.safetensors"
+    ],
+    "tokenizer_files": [],
+    "shard_count": 1,
+    "weight_format": "safetensors"
+  },
+  "model_spec": {
+    "model_dir": "/root/private_data/thousand_model/models/glm45_air_105b_spec",
+    "model_type": "glm4_moe",
+    "architecture": "Glm4MoeForCausalLM",
+    "hidden_size": 4096,
+    "intermediate_size": 10944,
+    "num_layers": 46,
+    "num_heads": 96,
+    "num_kv_heads": 8,
+    "vocab_size": 151552,
+    "max_seq_len": 40960,
+    "rope_theta": 1000000.0,
+    "rms_norm_eps": 1e-05,
+    "tie_word_embeddings": false,
+    "source_torch_dtype": "bfloat16",
+    "estimated_total_params": 112101019648,
+    "estimated_params_per_layer": 2409989164,
+    "head_dim": 128,
+    "partial_rotary_factor": 0.5,
+    "num_experts": 128,
+    "num_experts_per_tok": 8,
+    "moe_intermediate_size": 1408,
+    "shared_expert_intermediate_size": 10944,
+    "first_k_dense_replace": 1,
+    "num_nextn_predict_layers": 1
+  },
+  "environment": {
+    "accelerator_type": "hip",
+    "device_count": 128,
+    "devices": [
+      {
+        "index": 0,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 1,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 2,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 3,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 4,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 5,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 6,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 7,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 8,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 9,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 10,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 11,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 12,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 13,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 14,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 15,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 16,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 17,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 18,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 19,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 20,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 21,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 22,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 23,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 24,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 25,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 26,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 27,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 28,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 29,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 30,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 31,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 32,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 33,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 34,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 35,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 36,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 37,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 38,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 39,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 40,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 41,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 42,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 43,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 44,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 45,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 46,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 47,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 48,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 49,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 50,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 51,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 52,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 53,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 54,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 55,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 56,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 57,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 58,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 59,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 60,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 61,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 62,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 63,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 64,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 65,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 66,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 67,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 68,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 69,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 70,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 71,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 72,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 73,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 74,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 75,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 76,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 77,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 78,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 79,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 80,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 81,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 82,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 83,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 84,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 85,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 86,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 87,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 88,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 89,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 90,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 91,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 92,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 93,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 94,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 95,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 96,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 97,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 98,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 99,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 100,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 101,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 102,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 103,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 104,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 105,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 106,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 107,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 108,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 109,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 110,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 111,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 112,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 113,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 114,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 115,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 116,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 117,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 118,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 119,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 120,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 121,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 122,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 123,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 124,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 125,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 126,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 127,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      }
+    ],
+    "primary_device_name": "BW",
+    "primary_device_memory_bytes": 68719476736,
+    "torch_version": "2.7.1",
+    "hip_version": "6.3.26093"
+  }
+}

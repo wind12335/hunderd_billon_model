@@ -1,0 +1,31 @@
+trl
+transformers == 5.11.0
+packaging
+six
+regex
+pyyaml
+sentencepiece
+pybind11
+blobfile
+flux
+tiktoken
+# torch == 2.9.0
+numpy == 1.26.0
+nvidia-modelopt
+flash-linear-attention == 0.5.1
+
+hydra-core
+omegaconf
+tilelang
+# ==== test ====
+nltk
+pytest
+requests 
+wrapt
+tensorboard
+tensorboardX
+scipy
+psutil
+setuptools == 80.8.0
+setuptools-scm == 9.2.2
+modelscope

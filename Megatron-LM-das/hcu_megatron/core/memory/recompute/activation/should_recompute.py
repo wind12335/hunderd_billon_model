@@ -1,0 +1,11 @@
+# Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+from hcu_megatron.core.memory.recompute.recompute_common import should_recompute
+
+
+def should_recompute_activation(layer_number, config):
+    if not config.recompute_activation_function or layer_number is None:
+        return False
+
+    return should_recompute(config, layer_number, config.recompute_activation_function_num_layers)

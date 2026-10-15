@@ -1,0 +1,97 @@
+{
+  "entrypoint": "Megatron-LM/pretrain_gpt.py",
+  "model_args": {
+    "use_mcore_models": true,
+    "num_layers": 32,
+    "hidden_size": 4096,
+    "ffn_hidden_size": 14336,
+    "num_attention_heads": 32,
+    "seq_length": 4096,
+    "max_position_embeddings": 131072,
+    "position_embedding_type": "rope",
+    "normalization": "RMSNorm",
+    "swiglu": true,
+    "untie_embeddings_and_output_weights": true,
+    "disable_bias_linear": true,
+    "rotary_base": 500000,
+    "num_query_groups": 8
+  },
+  "parallelism": {
+    "tensor_model_parallel_size": 4,
+    "pipeline_model_parallel_size": 1,
+    "sequence_parallel": true
+  },
+  "training_args": {
+    "micro_batch_size": 1,
+    "global_batch_size": 4,
+    "bf16": true,
+    "use_distributed_optimizer": true,
+    "recompute_granularity": "full",
+    "recompute_method": "uniform",
+    "recompute_num_layers": 1
+  },
+  "data_args": {
+    "tokenizer_type": "HuggingFaceTokenizer",
+    "tokenizer_model": "/root/private_data/thousand_model/model/Llama-3.1-8B",
+    "vocab_size": 128256,
+    "data_path": "${DATA_PATH}",
+    "split": "949,50,1",
+    "data_cache_path": "${DATA_CACHE_PATH}"
+  },
+  "runtime_args": {
+    "save": "${CHECKPOINT_DIR}",
+    "load": "${CHECKPOINT_DIR}",
+    "tensorboard_dir": "${TENSORBOARD_DIR}",
+    "log_interval": 1,
+    "eval_interval": 100,
+    "eval_iters": 10,
+    "save_interval": 100
+  },
+  "parallel_plan": {
+    "model_path": "/root/private_data/thousand_model/model/Llama-3.1-8B",
+    "tp": 4,
+    "dp": 4,
+    "pp": 1,
+    "ep": 1,
+    "mesh": {
+      "tp": 4,
+      "dp": 4
+    },
+    "world_size": 16,
+    "attention_policy": "head_shard",
+    "mlp_policy": "colrow_shard",
+    "attention_policy_front": "head_shard",
+    "attention_policy_mid": "head_shard",
+    "attention_policy_back": "head_shard",
+    "mlp_policy_front": "colrow_shard",
+    "mlp_policy_mid": "colrow_shard",
+    "mlp_policy_back": "colrow_shard",
+    "embedding_policy": "vocab_shard",
+    "lm_head_policy": "vocab_shard",
+    "sequence_parallel": true,
+    "micro_batch_size": 1,
+    "global_batch_size": 4,
+    "parallel_mode": "MODEL_PARALLEL",
+    "execution_mode": "current_feasible",
+    "strategy_name": "BLOCK_LEVEL_FAST",
+    "strategy_policy": "BALANCED",
+    "search_time_seconds": 0.002173788845539093,
+    "estimated_memory_bytes": 32894649630,
+    "memory_margin_bytes": 30327268967,
+    "fits_current_environment": true,
+    "requires_additional_devices": 0,
+    "megatron_lowerable": true,
+    "notes": [
+      "mesh=tp=4,dp=4,pp=1",
+      "proposal=tp=4,dp=4,pp=1|attn=(head_shard,head_shard,head_shard)|mlp=(colrow_shard,colrow_shard,colrow_shard)|emb=vocab_shard|head=vocab_shard",
+      "pp=1,ep=1"
+    ]
+  },
+  "notes": [
+    "搜索域覆盖 DP + TP + PP（MoE 模型额外包含 EP 候选）。",
+    "显存过滤使用 block-level 粗估，并假设开启激活重计算。",
+    "选定搜索策略 BLOCK_LEVEL_FAST，策略偏好 BALANCED，耗时 0.0022 秒。",
+    "最终显式 ParallelPlan: TP=4, DP=4, PP=1, EP=1, attention=head_shard, mlp=colrow_shard, embedding=vocab_shard, lm_head=vocab_shard。",
+    "三段式策略: attn(front/mid/back)=(head_shard,head_shard,head_shard), mlp(front/mid/back)=(colrow_shard,colrow_shard,colrow_shard)。"
+  ]
+}

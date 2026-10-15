@@ -1,0 +1,17 @@
+# 模型权重与生成产物(162G + 105G,不入库)
+/model/
+/generated/autoparallel/
+# core dump
+core.*
+# 含 API 令牌的本地备忘,严禁入库
+对话.txt
+# 嵌套仓库:内部 git 元数据(无论 .git 还是改名后的 .git_local_history)与第三方源码树不入库
+/Megatron-LM-das/.git/
+/Megatron-LM-das/.git_local_history/
+/Megatron-LM-das/3rdparty/
+/train-cookbook-das/.git/
+/train-cookbook-das/.git_local_history/
+# 杂项
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
