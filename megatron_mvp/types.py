@@ -63,6 +63,20 @@ class ModelSpec:
     shared_expert_intermediate_size: int | None = None
     first_k_dense_replace: int = 0
     num_nextn_predict_layers: int = 0
+    # attention 的 QKV 投影带偏置（GLM-4.5 的 attention_bias=true）。
+    attention_bias: bool = False
+    # 路由打分方式："sigmoid" 表示 DeepSeek-V3 式 sigmoid + 专家偏置路由，
+    # 从权重索引里的 e_score_correction_bias 探测；None 表示默认 softmax。
+    moe_router_score_function: str | None = None
+    # MLA（Multi-head Latent Attention，KV 低秩压缩注意力；DeepSeek-V3 / Ling 系）。
+    # 从 config 里的 kv_lora_rank 探测；use_mla=True 时 attention 参数按 MLA
+    # 低秩结构估算，render 侧输出 --multi-latent-attention + 五个维度标志。
+    use_mla: bool = False
+    q_lora_rank: int | None = None
+    kv_lora_rank: int | None = None
+    qk_nope_head_dim: int | None = None
+    qk_rope_head_dim: int | None = None
+    mla_v_head_dim: int | None = None
 
     @property
     def is_moe(self) -> bool:
@@ -101,6 +115,18 @@ class RuntimeEnvironment:
     primary_device_memory_bytes: int
     torch_version: str
     hip_version: str | None
+    # 拓扑与互连规格（G3）：通信组是否跨节点直接决定代价量级。
+    # 默认值来自 second_hygon Phase6 实测（BW1000 双机 16 卡，2026-10 报告）：
+    #   机内 busbw≈1.1TB/s（custom AR 33.6MB@52µs 反推，报告注明待微基准确认，
+    #   RCCL 训练集合通信会更低）；机内小消息 wire 地板 ~13µs；
+    #   机间 shca 400G 光纤 = 50GB/s 线速（大消息有效带宽待微基准）；
+    #   机间 92µs 为实测"全局最小时长均值"口径（含协议地板）。
+    # 可用 AUTOPLAN_TOPO_* 环境变量覆盖；微基准实测后回填此处。
+    gpus_per_node: int = 8
+    intra_node_bandwidth_bytes_per_sec: float = 1.1e12
+    inter_node_bandwidth_bytes_per_sec: float = 50.0e9
+    intra_node_latency_seconds: float = 13e-6
+    inter_node_latency_seconds: float = 92e-6
 
     def to_dict(self) -> dict[str, Any]:
         """转成可序列化字典。"""
@@ -112,6 +138,11 @@ class RuntimeEnvironment:
             "primary_device_memory_bytes": self.primary_device_memory_bytes,
             "torch_version": self.torch_version,
             "hip_version": self.hip_version,
+            "gpus_per_node": self.gpus_per_node,
+            "intra_node_bandwidth_bytes_per_sec": self.intra_node_bandwidth_bytes_per_sec,
+            "inter_node_bandwidth_bytes_per_sec": self.inter_node_bandwidth_bytes_per_sec,
+            "intra_node_latency_seconds": self.intra_node_latency_seconds,
+            "inter_node_latency_seconds": self.inter_node_latency_seconds,
         }
 
 
@@ -128,6 +159,51 @@ class MemoryEstimate:
     def to_dict(self) -> dict[str, Any]:
         """转成可序列化字典。"""
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class CommEstimate:
+    """描述每卡每步的解析式通信估算（G2/G3，模型见 comm_model.py）。
+
+    bytes 均为"每卡每步搬动的字节数"（集合通信按 ring 通信量系数折算），
+    seconds 按"通信组是否跨节点"选择机内/机间带宽折算并叠加时延项。
+    """
+
+    tp_bytes: int
+    dp_bytes: int
+    pp_bytes: int
+    ep_bytes: int
+    tp_seconds: float
+    dp_seconds: float
+    pp_seconds: float
+    ep_seconds: float
+    cross_node: dict[str, bool]
+
+    @property
+    def total_bytes(self) -> int:
+        """返回每卡每步总通信字节数。"""
+        return self.tp_bytes + self.dp_bytes + self.pp_bytes + self.ep_bytes
+
+    @property
+    def total_seconds(self) -> float:
+        """返回每卡每步总通信时间（解析近似，不含与计算的重叠）。"""
+        return self.tp_seconds + self.dp_seconds + self.pp_seconds + self.ep_seconds
+
+    def to_dict(self) -> dict[str, Any]:
+        """转成可序列化字典。"""
+        return {
+            "tp_bytes": self.tp_bytes,
+            "dp_bytes": self.dp_bytes,
+            "pp_bytes": self.pp_bytes,
+            "ep_bytes": self.ep_bytes,
+            "tp_seconds": self.tp_seconds,
+            "dp_seconds": self.dp_seconds,
+            "pp_seconds": self.pp_seconds,
+            "ep_seconds": self.ep_seconds,
+            "total_bytes": self.total_bytes,
+            "total_seconds": self.total_seconds,
+            "cross_node": dict(self.cross_node),
+        }
 
 
 @dataclass(frozen=True)
@@ -359,6 +435,8 @@ class SearchCandidate:
     requires_additional_devices: int
     parallel_plan: ParallelPlan
     score: tuple[int, ...] = field(repr=False)
+    # 解析式通信估算（G2）；None 表示尚未计算（旧调用方兼容）。
+    communication: CommEstimate | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """转成可序列化字典。"""
@@ -374,6 +452,7 @@ class SearchCandidate:
             "fits_current_environment": self.fits_current_environment,
             "requires_additional_devices": self.requires_additional_devices,
             "parallel_plan": self.parallel_plan.to_dict(),
+            "communication": self.communication.to_dict() if self.communication else None,
         }
 
 
@@ -459,6 +538,8 @@ class CoarseIR:
     search: dict[str, Any]
     model: dict[str, Any]
     search_notes: list[str]
+    # 选定方案的通信估算与存档节奏建议（G2/G3/G7）；无估算时为 None。
+    communication: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """转成可序列化字典。"""
@@ -475,6 +556,7 @@ class CoarseIR:
             "search": self.search,
             "model": self.model,
             "search_notes": self.search_notes,
+            "communication": self.communication,
         }
 
 

@@ -156,7 +156,14 @@ def _build_runtime_megatron_config(
     training_args["init_method_std"] = 0.02
 
     runtime_args["log_interval"] = config.log_interval
-    runtime_args["save_interval"] = config.save_interval
+    # 存档节奏（G7）：显式 save_interval 优先；否则沿用 render 按通信/墙钟
+    # 估算给出的推荐值（约 1 小时一次）。保留间隔恒为有效存档间隔的 10 倍，
+    # 满足引擎 save_retain_interval % save_interval == 0 的校验。
+    if config.save_interval is not None:
+        runtime_args["save_interval"] = config.save_interval
+    effective_save_interval = int(runtime_args.get("save_interval") or 100)
+    runtime_args["save_interval"] = effective_save_interval
+    runtime_args["save_retain_interval"] = effective_save_interval * 10
     runtime_args["eval_iters"] = config.eval_iters
     # Megatron 的训练代码里会直接执行 `train_iters // eval_interval`。
     # 因此“关闭评估”不能简单传 `eval_interval=0`，否则会触发除零。
@@ -252,6 +259,11 @@ def _build_launch_script(
     if not config.use_mock_data and config.data_path is not None:
         data_path_export = f'export DATA_PATH="${{DATA_PATH:-{config.data_path}}}"\n'
 
+    # 注记块：含通信估算（G2/G3）与存档节奏（G7）两行（无估算时为空）。
+    notes_lines = "".join(
+        f"# 注记: {note}\n" for note in megatron_config.get("notes", [])
+    )
+
     return f'''#!/usr/bin/env bash
 set -euo pipefail
 
@@ -262,7 +274,7 @@ set -euo pipefail
 # 规划推荐: TP={plan.parallel_spec.tp_size}, DP={plan.parallel_spec.dp_size}, PP={plan.parallel_spec.pp_size}, WORLD_SIZE={plan.parallel_spec.world_size}
 # 显式策略: attention={plan.parallel_plan.attention_policy}, mlp={plan.parallel_plan.mlp_policy}, embedding={plan.parallel_plan.embedding_policy}, lm_head={plan.parallel_plan.lm_head_policy}
 # 三段式策略: attn=({plan.parallel_plan.resolved_attention_policy_front()},{plan.parallel_plan.resolved_attention_policy_mid()},{plan.parallel_plan.resolved_attention_policy_back()}), mlp=({plan.parallel_plan.resolved_mlp_policy_front()},{plan.parallel_plan.resolved_mlp_policy_mid()},{plan.parallel_plan.resolved_mlp_policy_back()})
-# 当前执行: {runtime_note}
+{notes_lines}# 当前执行: {runtime_note}
 #
 # 单机用法:  bash {script_name}
 # 多机用法:  在每台节点上用不同 NODE_RANK 启动同一份脚本:
@@ -302,6 +314,7 @@ python3 -m torch.distributed.run \
     --node_rank "${{NODE_RANK}}" \
     --master_addr "${{MASTER_ADDR}}" \
     --master_port "${{MASTER_PORT}}" \
+    --rdzv-conf "timeout=${{RDZV_TIMEOUT:-2400}}" \
     "${{ROOT_DIR}}/tools/run_megatron_hygon.py" {config.entrypoint} \
     --rank "${{RANK:-0}}" \
     --world-size "${{WORLD_SIZE}}" \
@@ -903,6 +916,7 @@ python3 -m torch.distributed.run \
     --node_rank "${{NODE_RANK}}" \
     --master_addr "${{MASTER_ADDR}}" \
     --master_port "${{MASTER_PORT}}" \
+    --rdzv-conf "timeout=${{RDZV_TIMEOUT:-2400}}" \
     "${{ROOT_DIR}}/tools/run_pytorch_llama_tp_dp.py" \
     --config "{runtime_config_path}"
 '''

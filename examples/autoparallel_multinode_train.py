@@ -7,7 +7,7 @@
 
     python3 examples/autoparallel_multinode_train.py \
         --num-nodes 2 --gpus-per-node 8 \
-        --model-path models/glm45_air_105b_spec \
+        --model-path models/glm45_air_base \
         --search-max-pp 2 --search-max-ep 2 \
         --memory-target-gb 64 \
         --run-mode LOWER
@@ -16,7 +16,7 @@
 
     python3 examples/autoparallel_multinode_train.py \
         --num-nodes 16 --gpus-per-node 8 \
-        --model-path models/glm45_air_105b_spec \
+        --model-path models/glm45_air_base \
         --search-max-pp 8 --search-max-ep 8 \
         --memory-target-gb 64 \
         --run-mode LOWER
@@ -25,7 +25,7 @@
 
     python3 examples/autoparallel_multinode_train.py \
         --num-nodes 2 --gpus-per-node 8 \
-        --model-path models/glm45_air_105b_spec \
+        --model-path models/glm45_air_base \
         --explicit tp=2,dp=4,pp=2,ep=2 \
         --run-mode LOWER
 
@@ -39,7 +39,8 @@
 
 注意
 ----
-- PLAN/LOWER 模式只需要当前机器能 import torch（用于环境探测），单卡开发机即可运行。
+- PLAN/LOWER 模式只需要当前机器能 import torch（用于环境探测），单卡开发机即可运行；
+  完全无卡的机器可设 AUTOPLAN_STANDIN_GPUS=<每节点卡数> 用替身环境做 cross-compile 规划。
 - LAUNCH 模式会在当前机器直接执行 smoke 脚本，多机验证请用第 4 步的 launch_cluster.py。
 - PYTORCH backend 只支持 DP+TP（自动把 PP/EP 压回 1）；多机 PP/EP 请用 MEGATRON backend。
 """
@@ -56,7 +57,7 @@ from autoparallel import ParallelPlan
 from autoparallel import parallelize
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "glm45_air_105b_spec"
+DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "glm45_air_base"
 
 
 def parse_explicit_plan(raw: str) -> ParallelPlan:

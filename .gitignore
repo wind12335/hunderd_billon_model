@@ -1,5 +1,7 @@
-# 模型权重与生成产物(162G + 105G,不入库)
+# 模型权重、数据集与生成产物(162G + 105G + ~10G 数据,不入库)
 /model/
+/models/
+/datasets/
 /generated/autoparallel/
 # core dump
 core.*
@@ -15,3 +17,4 @@ core.*
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.vcjob_master_addr.*

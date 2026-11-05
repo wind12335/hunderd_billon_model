@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 双机 16 卡多机链路测试启动脚本（两种平台自适应）
+# 多机 N×8 卡链路测试启动脚本（两种平台自适应；由双机 16 卡泛化到 N worker）
 #
-# 【SCNet 模型训练模块 / K8s vcjob 模式】← 平台用 /bin/sh 在两个 worker 上
-#   各执行一次本脚本，无需任何参数：
+# 【SCNet 模型训练模块 / K8s vcjob 模式】← 平台用 /bin/sh 在所有 worker 上
+#   各执行一次本脚本，无需位置参数；规模/模型经环境变量配置（见"vcjob 调参"）：
 #     * pod 名以 -worker-0 结尾 → 主节点：体检→初始化子模块→生成脚本→
 #       把本机 IP 写入共享目录 → 以 NODE_RANK=0 启动训练
-#     * pod 名以 -worker-1 结尾 → 从节点：等待主节点就绪 → 以 NODE_RANK=1 启动
-#   依赖：/root/private_data/thousand_model 为两 worker 共享挂载。
+#     * pod 名以 -worker-N 结尾（N≥1）→ 从节点：等待主节点就绪 → 以 NODE_RANK=N 启动
+#   依赖：/root/private_data/hunderd_billon_model 为各 worker 共享挂载。
+#   vcjob 调参（写在作业环境变量里，不设走括号内默认）：
+#     NUM_NODES=8|16        worker 总数（2）——64 卡=8、128 卡=16，必设！
+#     MODEL_PATH=...        模型目录（model/Llama-3.1-8B）
+#     TRAIN_ITERS=20        训练步数（20；排练 20~50，正式 1250）
+#     SEQ_LEN=2048          序列长度（4096；GLM 微调按 PDF 用 2048）
+#     RUN_TAG=glm64_rehearsal  生成目录名（dual16_llama8b），区分不同试验
+#     SEARCH_MAX_PP/EP      规划搜索上限（2 / 8；GLM 的 EP 必须放开到 8）
 #
 # 【裸机 SSH 模式】（手动在 worker0 上执行）
 #   bash scripts/run_dual_node_test.sh <worker1地址> [--mode check|generate|smoke|run|stop]
@@ -34,17 +41,20 @@ trap 'rc=$?; printf "\033[1;31m[dual-test][异常退出]\033[0m 脚本在第 %s 
 # ── 默认参数 ─────────────────────────────────────────────────────────────────
 WORKER1=""
 WORKER0=""
-MODEL_PATH="model/Llama-3.1-8B"
+MODEL_PATH="${MODEL_PATH:-model/Llama-3.1-8B}"
 MASTER_PORT="${MASTER_PORT:-29500}"
-TRAIN_ITERS=20
-SEQ_LEN=4096
+TRAIN_ITERS="${TRAIN_ITERS:-20}"
+SEQ_LEN="${SEQ_LEN:-4096}"
 MODE="auto"
 SKIP_CHECKS=0
-GPUS_PER_NODE=8
-NUM_NODES=2
+GPUS_PER_NODE="${GPUS_PER_NODE:-8}"
+NUM_NODES="${NUM_NODES:-2}"
+SEARCH_MAX_PP="${SEARCH_MAX_PP:-2}"
+SEARCH_MAX_EP="${SEARCH_MAX_EP:-8}"
+RUN_TAG="${RUN_TAG:-dual16_llama8b}"
 
 REPO_ROOT=""   # 由 detect_repo_root() 解析：平台可能把启动脚本 staging 到 / 执行，不能依赖脚本自身路径
-OUT_DIR="${REPO_ROOT}/generated/dual16_llama8b"
+OUT_DIR="${REPO_ROOT}/generated/${RUN_TAG}"
 PLAN_SCRIPT="${OUT_DIR}/launch_megatron_plan.sh"
 ADDR_MARKER="${OUT_DIR}/.vcjob_master_addr"
 
@@ -53,6 +63,23 @@ warn() { printf '\033[1;33m[dual-test][警告]\033[0m %s\n' "$*"; }
 # 失败信息同时写 stdout+stderr：平台日志收集疑似不收 stderr，只写 stderr
 # 的 die() 会表现为"零日志静默死"（2026-10-07 worker-0 实际发生）
 die()  { printf '\033[1;31m[dual-test][失败]\033[0m %s\n' "$*" | tee /dev/stderr; exit 1; }
+
+# ── 微基准开关：BENCH_ONLY 隐含开启 BENCH_COMM（否则该组合静默变成完整训练）──
+BENCH_COMM="${BENCH_COMM:-0}"
+BENCH_ONLY="${BENCH_ONLY:-0}"
+START_TS="$(date +%s)"
+if [[ "$BENCH_ONLY" == "1" && "$BENCH_COMM" != "1" ]]; then
+    log "BENCH_ONLY=1 隐含开启 BENCH_COMM=1"
+    BENCH_COMM=1
+fi
+
+port_any_open() {  # $1=地址，其余参数=端口列表；任一可连即返回 0
+    local addr="$1" p; shift
+    for p in "$@"; do
+        timeout 3 bash -c "echo > /dev/tcp/${addr}/${p}" 2>/dev/null && return 0
+    done
+    return 1
+}
 
 usage() {
     cat <<'EOF'
@@ -67,6 +94,8 @@ usage() {
   --seq-len <n>        序列长度（默认 4096）
   --mode <m>           auto|check|generate|smoke|run|stop（默认 auto）
   --skip-checks        跳过体检（不建议）
+vcjob 规模/模型经环境变量配置: NUM_NODES(默认2,64卡=8,128卡=16) MODEL_PATH
+TRAIN_ITERS SEQ_LEN RUN_TAG SEARCH_MAX_PP SEARCH_MAX_EP —— 详见文件头注释
 EOF
 }
 
@@ -96,8 +125,8 @@ detect_repo_root() {
         "${THOUSAND_MODEL_ROOT:-}"
         "${script_dir}/.."
         "${script_dir}"
-        "/root/private_data/thousand_model"
-        "${HOME:-/root}/private_data/thousand_model"
+        "/root/private_data/hunderd_billon_model"
+        "${HOME:-/root}/private_data/hunderd_billon_model"
         "/root/private_data"
         "/mnt/data/thousand_model"
         "/mnt/data"
@@ -109,7 +138,7 @@ detect_repo_root() {
             c="$(cd "$c" 2>/dev/null && pwd)" || continue
             if [[ -f "$c/tools/launch_cluster.py" && -f "$c/megatron_mvp/search.py" ]]; then
                 REPO_ROOT="$c"
-                OUT_DIR="${REPO_ROOT}/generated/dual16_llama8b"
+                OUT_DIR="${REPO_ROOT}/generated/${RUN_TAG}"
                 PLAN_SCRIPT="${OUT_DIR}/launch_megatron_plan.sh"
                 ADDR_MARKER="${OUT_DIR}/.vcjob_master_addr"
                 return
@@ -173,18 +202,36 @@ ensure_submodules() {
 
 # ── 规划 + 生成（world=16 硬校验，防拓扑错配 bug）───────────────────────────
 generate() {
-    log "生成多机脚本（预期 world_size=16）..."
+    local expected; expected=$(( NUM_NODES * GPUS_PER_NODE ))
+    log "生成多机脚本（预期 world_size=${expected} = ${NUM_NODES}节点 × ${GPUS_PER_NODE}卡）..."
     cd "$REPO_ROOT"; export PYTHONPATH="$REPO_ROOT"
     local gen_log; gen_log="$(mktemp /tmp/dual16_gen.XXXXXX.log)"
     python3 examples/autoparallel_multinode_train.py \
         --num-nodes "$NUM_NODES" --gpus-per-node "$GPUS_PER_NODE" \
         --model-path "$MODEL_PATH" \
         --backend MEGATRON --run-mode LOWER \
+        --search-max-pp "$SEARCH_MAX_PP" --search-max-ep "$SEARCH_MAX_EP" \
         --sequence-length "$SEQ_LEN" --train-iters "$TRAIN_ITERS" \
         --output-dir "$OUT_DIR" 2>&1 | tee "$gen_log"
-    grep -q "world_size=16" "$gen_log" || die "world_size != 16（拓扑错配 bug 或显存判定异常），已阻止启动。日志: $gen_log"
-    log "world_size=16 校验通过"
+    grep -q "world_size=${expected}" "$gen_log" || die "world_size != ${expected}（拓扑错配 bug 或显存判定异常），已阻止启动。日志: $gen_log"
+    log "world_size=${expected} 校验通过"
     [[ -f "$PLAN_SCRIPT" ]] || die "未找到生成脚本 ${PLAN_SCRIPT}"
+    # FORCE_EP=<n>：生成后把 --expert-model-parallel-size 覆写为 n（Run B 跨机
+    # a2a 冒烟用）。必须走环境变量而不是手改生成文件——重提交会重新 generate()
+    # 覆盖手改。合法性与用途：ep 需整除 dp；tp*ep > 每节点卡数 才跨节点。
+    if [[ -n "${FORCE_EP:-}" ]]; then
+        [[ "$FORCE_EP" =~ ^[1-9][0-9]*$ ]] || die "FORCE_EP 必须是非零正整数: ${FORCE_EP}"
+        local s
+        for s in "$PLAN_SCRIPT" "${OUT_DIR}/launch_megatron.sh"; do
+            [[ -f "$s" ]] || continue
+            grep -q -- "--expert-model-parallel-size [0-9][0-9]*" "$s" \
+                || die "FORCE_EP 注入失败：${s} 中没有 --expert-model-parallel-size"
+            sed -i "s/--expert-model-parallel-size [0-9][0-9]*/--expert-model-parallel-size ${FORCE_EP}/" "$s"
+            grep -q -- "--expert-model-parallel-size ${FORCE_EP}" "$s" \
+                || die "FORCE_EP=${FORCE_EP} 覆写后校验失败: ${s}"
+        done
+        log "FORCE_EP=${FORCE_EP} 已注入（注意 ep 需整除 dp；tp*ep>8 才跨节点）"
+    fi
 }
 
 # ── shca RDMA：跨节点通信从 NET/Socket(TCP) 升级为 RDMA ──────────────────────
@@ -255,6 +302,24 @@ enable_rdma() {
     fi
 }
 
+run_comm_bench() {  # $1=node_rank  $2=master_addr —— BENCH_COMM=1 时训练前跑一次
+    log "通信微基准: node_rank=$1 nnodes=${NUM_NODES} master=$2:$((MASTER_PORT+1))"
+    # 失败只告警不阻断训练（微基准是标定项，不是链路判据）。
+    # 墙钟兜底：必须严格短于训练侧 torchrun 静态 rendezvous 窗口（实测 600s，
+    # 旧版 900s）——否则"一侧 bench 挂死、另一侧跳级进训练"会先耗尽对方的
+    # 窗口造成级联双亡。540s<600s 留出余量；bench 进程组另有 300s 超时自毙
+    # （bench_comm_hygon.py 的 BENCH_TIMEOUT_SEC），墙钟是最后一道闸
+    BENCH_TIMEOUT_SEC="${BENCH_TIMEOUT_SEC:-300}" \
+    timeout --signal=TERM --kill-after=30s "${BENCH_WALL_SECONDS:-540}" \
+        python3 -m torch.distributed.run \
+        --nproc_per_node "${GPUS_PER_NODE}" --nnodes "${NUM_NODES}" \
+        --node_rank "$1" --master_addr "$2" --master_port "$((MASTER_PORT + 1))" \
+        --rdzv-conf "timeout=${BENCH_RDZV_TIMEOUT:-180}" \
+        "${REPO_ROOT}/tools/bench_comm_hygon.py" \
+        --out "${OUT_DIR}/comm_bench_w${NUM_NODES}.csv" \
+        || log "微基准失败(不阻断训练，把上面报错发我)"
+}
+
 start_training() {  # $1=node_rank  $2=master_addr
     log "启动训练: NODE_RANK=$1 NNODES=${NUM_NODES} MASTER_ADDR=$2:${MASTER_PORT}"
     log "成功判据: 本节点日志出现 iteration x/${TRAIN_ITERS} ... loss="
@@ -277,10 +342,23 @@ start_training() {  # $1=node_rank  $2=master_addr
     # 在平台环境变量里设 NCCL_DEBUG=INFO 即可恢复
     export NCCL_DEBUG="${NCCL_DEBUG:-WARN}"
     # 生成脚本里默认 60 分钟；调短以便卡死时尽快拿到真实报错栈而非干等
-    export DIST_TIMEOUT_MIN="${DIST_TIMEOUT_MIN:-20}"
+    export DIST_TIMEOUT_MIN="${DIST_TIMEOUT_MIN:-30}"
     log "NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME}  DIST_TIMEOUT_MIN=${DIST_TIMEOUT_MIN}"
     # 跨节点通道升级：TCP → shca RDMA（资产缺失/失败自动回退 TCP，见函数头注释）
     enable_rdma
+    # BENCH_COMM=1：训练前先跑通信微基准（all-reduce/a2a/matmul，CSV 落 OUT_DIR），
+    # 用于标定 megatron_mvp/comm_model.py 的机内/机间带宽与 TFLOPS 常数；
+    # BENCH_ONLY=1 时跑完基准即退出（专跑基准的廉价 vcjob）。
+    if [[ "${BENCH_COMM:-0}" == "1" ]]; then
+        run_comm_bench "$1" "$2"
+        if [[ "${BENCH_ONLY:-0}" == "1" ]]; then
+            # 基准专跑作业必须有产出：无 CSV 却退出码 0 是"假成功"
+            [[ -f "${OUT_DIR}/comm_bench_w${NUM_NODES}.csv" ]] \
+                || die "BENCH_ONLY：微基准未产出 CSV（把上方报错发我）"
+            log "BENCH_ONLY=1：基准完成即退出，不启动训练"
+            exit 0
+        fi
+    fi
     export NNODES="$NUM_NODES" NODE_RANK="$1" MASTER_ADDR="$2" MASTER_PORT GPUS_PER_NODE
     exec bash "$PLAN_SCRIPT"
 }
@@ -292,23 +370,41 @@ vcjob_main() {
     case "$ROLE" in
         0)
             log "我是主节点(worker-0)"
+            # 清理+发布地址提前到体检/生成之前：①同名作业重提时旧 marker 的存活
+            # 窗口从分钟级压到秒级；②worker-1 可先拿地址、轮询等计划，不受制于
+            # 本机慢启动。只清本作业标记（通配 rm 会误删并发同 RUN_TAG 作业刚
+            # 发布的活标记），历史累积交给 find 只删 24 小时前的
+            mkdir -p "$OUT_DIR"
+            rm -f "${ADDR_MARKER}" "${ADDR_MARKER}.tmp"
+            find "${OUT_DIR}" -maxdepth 1 -name '.vcjob_master_addr*' -mmin +1440 -delete 2>/dev/null || true
+            printf '%s %s\n' "$JOB_TAG" "$myip" > "${ADDR_MARKER}.tmp" && mv "${ADDR_MARKER}.tmp" "$ADDR_MARKER"
+            log "已发布主节点地址(作业${JOB_TAG}) → ${ADDR_MARKER}"
             local_preflight
             ensure_submodules
             generate
-            mkdir -p "$OUT_DIR"
-            rm -f "${OUT_DIR}"/.vcjob_master_addr*   # 清理历史作业残留标记，防止无限累积
-            printf '%s %s\n' "$JOB_TAG" "$myip" > "${ADDR_MARKER}.tmp" && mv "${ADDR_MARKER}.tmp" "$ADDR_MARKER"
-            log "已发布主节点地址(作业${JOB_TAG}) → ${ADDR_MARKER}"
             start_training 0 "$myip"
             ;;
-        1)
-            log "我是从节点(worker-1)，等待主节点发布地址（最多 15 分钟）..."
-            local waited=0 marker_tag=""
+        *)
+            [[ "$ROLE" -ge 1 && "$ROLE" -lt "$NUM_NODES" ]] \
+                || die "worker 序号 ${ROLE} 超出 NUM_NODES=${NUM_NODES}：请在作业环境变量设置 NUM_NODES=<worker 总数>（64卡=8，128卡=16）"
+            log "我是从节点(worker-${ROLE}/${NUM_NODES})，等待主节点发布地址（最多 15 分钟）..."
+            local waited=0 marker_tag="" mt
             while :; do
                 if [[ -f "$ADDR_MARKER" ]]; then
                     marker_tag="$(awk '{print $1}' "$ADDR_MARKER" 2>/dev/null || true)"
-                    # 只接受本作业的标记；旧作业遗留文件（无标记/标记不符）继续等
-                    [[ "$marker_tag" == "$JOB_TAG" ]] && break
+                    # 只接受本作业的标记；旧作业遗留文件（无标记/标记不符）继续等。
+                    # 同名作业重启会让 JOB_TAG 相同的旧 marker 复活（指向已销毁
+                    # pod 的 IP），故再加两道闸：①marker 写于本作业启动前 60 秒内
+                    # （旧作业 pod 销毁到新 pod 起必远超 60s；本作业 worker-0 早
+                    # 写/worker-1 晚起的合法偏移由闸②兜底），或②该 IP 上确有
+                    # 活着的主节点端口；都不满足则继续等本作业 worker-0 重写
+                    if [[ "$marker_tag" == "$JOB_TAG" ]]; then
+                        mt="$(stat -c %Y "$ADDR_MARKER" 2>/dev/null || echo 0)"
+                        if [[ "$mt" -ge $(( START_TS - 60 )) ]] \
+                           || port_any_open "$(awk '{print $2}' "$ADDR_MARKER")" "$MASTER_PORT" "$((MASTER_PORT + 1))"; then
+                            break
+                        fi
+                    fi
                 fi
                 sleep 5; waited=$((waited+5))
                 [[ $waited -ge 900 ]] && die "等待本作业(${JOB_TAG})的地址标记超时：主节点生成失败或共享存储不可见，请查 worker-0 日志"
@@ -316,18 +412,30 @@ vcjob_main() {
             local master; master="$(awk '{print $2}' "$ADDR_MARKER")"
             [[ -n "$master" ]] || die "地址标记内容异常: $(cat "$ADDR_MARKER")"
             log "主节点地址: ${master}（作业标记 ${marker_tag} 吻合）"
-            [[ -f "$PLAN_SCRIPT" ]] || die "共享存储上看不到 ${PLAN_SCRIPT}：挂载目录非共享或主节点未生成完成"
-            local_preflight
-            log "等待主节点 rendezvous 端口 ${master}:${MASTER_PORT} 开放..."
-            waited=0
-            until timeout 3 bash -c "echo > /dev/tcp/${master}/${MASTER_PORT}" 2>/dev/null; do
-                sleep 5; waited=$((waited+5))
-                [[ $waited -ge 900 ]] && { warn "端口等待超时，仍尝试启动（若失败请检查主节点日志）"; break; }
+            # 主节点地址已提前发布，此刻可能仍在生成计划——轮询等待而非一票否决
+            local ps_deadline=$(( SECONDS + 600 ))
+            until [[ -f "$PLAN_SCRIPT" ]]; do
+                sleep 5
+                [[ $SECONDS -ge $ps_deadline ]] && die "等待 ${PLAN_SCRIPT} 超时：主节点生成失败或挂载非共享，请查 worker-0 日志"
             done
-            start_training 1 "$master"
-            ;;
-        *)
-            die "未预期的 worker 序号: $ROLE（本脚本面向双机，worker-0/1）"
+            log "计划脚本就绪: ${PLAN_SCRIPT}"
+            local_preflight
+            # 端口探测：BENCH_COMM=1 时主节点先跑微基准（端口 MASTER_PORT+1）再开
+            # 训练端口——从节点必须把微基准端口也当"主节点就绪"信号，否则两边互等
+            # 死锁（2026-10-26 实际卡住：worker-1 等 23456，worker-0 的微基准在
+            # 23457 上等它加入）。随后从节点在 start_training 里加入微基准，两边
+            # 汇合跑完，再各自进入训练 rendezvous（torchrun 自带等待，无需再探）。
+            local probe_ports=("${MASTER_PORT}")
+            [[ "${BENCH_COMM:-0}" == "1" ]] && probe_ports+=("$((MASTER_PORT + 1))")
+            log "等待主节点端口开放: ${master}:${probe_ports[*]}"
+            # 用 SECONDS 计时：把每轮最多 2×3s 的探测耗时也计入，修正"名义
+            # 15 分钟、实际最坏 ~33 分钟"的漏计
+            local deadline=$(( SECONDS + 900 ))
+            until port_any_open "$master" "${probe_ports[@]}"; do
+                sleep 5
+                [[ $SECONDS -ge $deadline ]] && { warn "端口等待超时，仍尝试启动（若失败请检查主节点日志）"; break; }
+            done
+            start_training "$ROLE" "$master"
             ;;
     esac
 }

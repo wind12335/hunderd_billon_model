@@ -59,7 +59,9 @@ class Config:
     min_lr: float = 1.0e-5
     weight_decay: float = 0.1
     log_interval: int = 1
-    save_interval: int = 1000
+    # None = 按通信/墙钟估算自动推荐存档间隔（约 1 小时一次，见 comm_model 与
+    # render）；显式给整数则覆盖推荐值。
+    save_interval: int | None = None
     eval_interval: int = 0
     eval_iters: int = 0
     explicit_plan: ParallelPlan | None = None

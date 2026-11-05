@@ -1,0 +1,489 @@
+{
+  "artifacts": {
+    "model_dir": "/root/private_data/hunderd_billon_model/models/glm45_air_base",
+    "config_path": "/root/private_data/hunderd_billon_model/models/glm45_air_base/config.json",
+    "weight_files": [
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00001-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00002-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00003-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00004-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00005-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00006-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00007-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00008-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00009-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00010-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00011-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00012-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00013-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00014-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00015-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00016-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00017-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00018-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00019-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00020-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00021-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00022-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00023-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00024-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00025-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00026-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00027-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00028-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00029-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00030-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00031-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00032-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00033-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00034-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00035-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00036-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00037-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00038-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00039-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00040-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00041-of-00042.safetensors",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/model-00042-of-00042.safetensors"
+    ],
+    "tokenizer_files": [
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/tokenizer.json",
+      "/root/private_data/hunderd_billon_model/models/glm45_air_base/tokenizer_config.json"
+    ],
+    "shard_count": 42,
+    "weight_format": "safetensors"
+  },
+  "model_spec": {
+    "model_dir": "/root/private_data/hunderd_billon_model/models/glm45_air_base",
+    "model_type": "glm4_moe",
+    "architecture": "Glm4MoeForCausalLM",
+    "hidden_size": 4096,
+    "intermediate_size": 10944,
+    "num_layers": 46,
+    "num_heads": 96,
+    "num_kv_heads": 8,
+    "vocab_size": 151552,
+    "max_seq_len": 131072,
+    "rope_theta": 1000000.0,
+    "rms_norm_eps": 1e-05,
+    "tie_word_embeddings": false,
+    "source_torch_dtype": "bfloat16",
+    "estimated_total_params": 106827993088,
+    "estimated_params_per_layer": 2295358152,
+    "head_dim": 128,
+    "partial_rotary_factor": 0.5,
+    "num_experts": 128,
+    "num_experts_per_tok": 8,
+    "moe_intermediate_size": 1408,
+    "shared_expert_intermediate_size": 1408,
+    "first_k_dense_replace": 1,
+    "num_nextn_predict_layers": 1,
+    "attention_bias": true,
+    "moe_router_score_function": "sigmoid",
+    "use_mla": false,
+    "q_lora_rank": null,
+    "kv_lora_rank": null,
+    "qk_nope_head_dim": null,
+    "qk_rope_head_dim": null,
+    "mla_v_head_dim": null
+  },
+  "environment": {
+    "accelerator_type": "hip",
+    "device_count": 64,
+    "devices": [
+      {
+        "index": 0,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 1,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 2,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 3,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 4,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 5,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 6,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 7,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 8,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 9,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 10,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 11,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 12,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 13,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 14,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 15,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 16,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 17,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 18,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 19,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 20,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 21,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 22,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 23,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 24,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 25,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 26,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 27,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 28,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 29,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 30,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 31,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 32,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 33,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 34,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 35,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 36,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 37,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 38,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 39,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 40,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 41,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 42,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 43,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 44,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 45,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 46,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 47,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 48,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 49,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 50,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 51,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 52,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 53,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 54,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 55,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 56,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 57,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 58,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 59,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 60,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 61,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 62,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      },
+      {
+        "index": 63,
+        "name": "BW1000-64G-planning-standin",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": null
+      }
+    ],
+    "primary_device_name": "BW1000-64G-planning-standin",
+    "primary_device_memory_bytes": 68719476736,
+    "torch_version": "2.9.0",
+    "hip_version": "6.3.26093",
+    "gpus_per_node": 8,
+    "intra_node_bandwidth_bytes_per_sec": 1100000000000.0,
+    "inter_node_bandwidth_bytes_per_sec": 50000000000.0,
+    "intra_node_latency_seconds": 1.3e-05,
+    "inter_node_latency_seconds": 9.2e-05
+  }
+}

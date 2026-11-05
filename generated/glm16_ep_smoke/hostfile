@@ -1,0 +1,6 @@
+# autoparallel 生成的多机 hostfile 模板。
+# 格式: 每行一个节点 `hostname[:ssh_port] [slots=N]`，# 开头为注释。
+# 第一行是主节点（MASTER_ADDR / NODE_RANK=0）。
+# 请把下面的 localhost 替换成真实节点主机名或 IP。
+localhost slots=8  # node0 -> 替换为真实主机名
+localhost slots=8  # node1 -> 替换为真实主机名

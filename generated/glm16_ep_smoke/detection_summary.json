@@ -1,0 +1,159 @@
+{
+  "artifacts": {
+    "model_dir": "/root/private_data/hunderd_billon_model/models/glm45_air_smoke",
+    "config_path": "/root/private_data/hunderd_billon_model/models/glm45_air_smoke/config.json",
+    "weight_files": [
+      "/root/private_data/hunderd_billon_model/models/glm45_air_smoke/model-00001-of-00001.safetensors"
+    ],
+    "tokenizer_files": [
+      "/root/private_data/hunderd_billon_model/models/glm45_air_smoke/tokenizer_config.json"
+    ],
+    "shard_count": 1,
+    "weight_format": "safetensors"
+  },
+  "model_spec": {
+    "model_dir": "/root/private_data/hunderd_billon_model/models/glm45_air_smoke",
+    "model_type": "glm4_moe",
+    "architecture": "Glm4MoeForCausalLM",
+    "hidden_size": 4096,
+    "intermediate_size": 10944,
+    "num_layers": 8,
+    "num_heads": 96,
+    "num_kv_heads": 8,
+    "vocab_size": 151552,
+    "max_seq_len": 131072,
+    "rope_theta": 1000000.0,
+    "rms_norm_eps": 1e-05,
+    "tie_word_embeddings": false,
+    "source_torch_dtype": "bfloat16",
+    "estimated_total_params": 17871736832,
+    "estimated_params_per_layer": 2078777344,
+    "head_dim": 128,
+    "partial_rotary_factor": 0.5,
+    "num_experts": 128,
+    "num_experts_per_tok": 8,
+    "moe_intermediate_size": 1408,
+    "shared_expert_intermediate_size": 1408,
+    "first_k_dense_replace": 1,
+    "num_nextn_predict_layers": 1,
+    "attention_bias": true,
+    "moe_router_score_function": "sigmoid",
+    "use_mla": false,
+    "q_lora_rank": null,
+    "kv_lora_rank": null,
+    "qk_nope_head_dim": null,
+    "qk_rope_head_dim": null,
+    "mla_v_head_dim": null
+  },
+  "environment": {
+    "accelerator_type": "hip",
+    "device_count": 16,
+    "devices": [
+      {
+        "index": 0,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 1,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 2,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 3,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 4,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 5,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 6,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 7,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 8,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 9,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 10,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 11,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 12,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 13,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 14,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      },
+      {
+        "index": 15,
+        "name": "BW",
+        "total_memory_bytes": 68719476736,
+        "multi_processor_count": 80
+      }
+    ],
+    "primary_device_name": "BW",
+    "primary_device_memory_bytes": 68719476736,
+    "torch_version": "2.7.1",
+    "hip_version": "6.3.26093",
+    "gpus_per_node": 8,
+    "intra_node_bandwidth_bytes_per_sec": 1100000000000.0,
+    "inter_node_bandwidth_bytes_per_sec": 50000000000.0,
+    "intra_node_latency_seconds": 1.3e-05,
+    "inter_node_latency_seconds": 9.2e-05
+  }
+}

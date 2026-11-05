@@ -222,21 +222,40 @@ def _estimate_moe_model_params(
     moe_intermediate_size: int | None,
     shared_expert_intermediate_size: int | None,
     first_k_dense_replace: int,
+    mla_fields: dict | None = None,
 ) -> tuple[int, float]:
     """按 MoE 结构估算总参数量与平均每层参数量。
 
     返回 (estimated_total_params, avg_params_per_layer)。
    MoE 层 = 路由专家全体 + 共享专家；dense 层 = 普通 SwiGLU MLP。
+    mla_fields 非空时 attention 按 MLA 低秩结构估算（与 search.py 内存模型
+    同一公式）。
     """
     if head_dim is None or head_dim <= 0:
         head_dim = hidden_size // num_heads if hidden_size % num_heads == 0 else hidden_size
-    kv_hidden_size = num_kv_heads * head_dim
-    q_hidden_size = num_heads * head_dim
-    attention_params = (
-        hidden_size * q_hidden_size
-        + hidden_size * kv_hidden_size * 2
-        + q_hidden_size * hidden_size
-    )
+    mla = mla_fields or {}
+    if mla.get("kv_lora_rank"):
+        nope_dim = mla.get("qk_nope_head_dim") or head_dim
+        rope_dim = mla.get("qk_rope_head_dim") or 0
+        v_dim = mla.get("v_head_dim") or nope_dim
+        kv_lora = int(mla["kv_lora_rank"])
+        if mla.get("q_lora_rank"):
+            attention_params = hidden_size * int(mla["q_lora_rank"]) + int(mla["q_lora_rank"]) * num_heads * (nope_dim + rope_dim)
+        else:
+            attention_params = hidden_size * num_heads * (nope_dim + rope_dim)
+        attention_params += (
+            hidden_size * (kv_lora + rope_dim)
+            + kv_lora * num_heads * (nope_dim + v_dim)
+            + num_heads * v_dim * hidden_size
+        )
+    else:
+        kv_hidden_size = num_kv_heads * head_dim
+        q_hidden_size = num_heads * head_dim
+        attention_params = (
+            hidden_size * q_hidden_size
+            + hidden_size * kv_hidden_size * 2
+            + q_hidden_size * hidden_size
+        )
     norm_params = hidden_size * 2
 
     routed_inter = moe_intermediate_size or intermediate_size
@@ -254,6 +273,50 @@ def _estimate_moe_model_params(
     transformer_params += dense_layers * (attention_params + dense_mlp_params + norm_params)
     avg_per_layer = transformer_params / max(num_layers, 1)
     return int(transformer_params), avg_per_layer
+
+
+def _extract_mla_fields(config: dict) -> dict:
+    """从 Hugging Face config 提取 MLA（KV 低秩压缩注意力）字段。
+
+    探测依据：config 里出现 kv_lora_rank（DeepSeek-V3 / Ling 系命名）。
+    返回空 dict 表示非 MLA 模型。维度命名映射到 mcore：
+    qk_nope_head_dim -> --qk-head-dim，qk_rope_head_dim -> --qk-pos-emb-head-dim，
+    v_head_dim -> --v-head-dim。
+    """
+    kv_lora_rank = _first_config_value(config, "kv_lora_rank")
+    if kv_lora_rank is None:
+        return {}
+    q_lora_rank = _first_config_value(config, "q_lora_rank")
+    qk_nope_head_dim = _first_config_value(config, "qk_nope_head_dim")
+    qk_rope_head_dim = _first_config_value(config, "qk_rope_head_dim")
+    v_head_dim = _first_config_value(config, "v_head_dim")
+    return {
+        "q_lora_rank": int(q_lora_rank) if q_lora_rank is not None else None,
+        "kv_lora_rank": int(kv_lora_rank),
+        "qk_nope_head_dim": int(qk_nope_head_dim) if qk_nope_head_dim is not None else None,
+        "qk_rope_head_dim": int(qk_rope_head_dim) if qk_rope_head_dim is not None else None,
+        "v_head_dim": int(v_head_dim) if v_head_dim is not None else None,
+    }
+
+
+def _detect_router_score_function(model_dir: Path) -> str | None:
+    """从权重索引探测 MoE 路由打分方式。
+
+    DeepSeek-V3 式路由（GLM-4.5 系）在 mlp.gate.e_score_correction_bias 处
+    存每专家偏置，对应 mcore 的 --moe-router-score-function sigmoid
+    + --moe-router-enable-expert-bias；未探测到则返回 None（默认 softmax）。
+    """
+    index_path = model_dir / "model.safetensors.index.json"
+    if not index_path.exists():
+        return None
+    try:
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    for key in index.get("weight_map", {}):
+        if key.endswith("mlp.gate.e_score_correction_bias"):
+            return "sigmoid"
+    return None
 
 
 def load_model_spec(artifacts: ModelArtifacts) -> ModelSpec:
@@ -279,7 +342,10 @@ def load_model_spec(artifacts: ModelArtifacts) -> ModelSpec:
     source_torch_dtype = str(config.get("torch_dtype", "unknown"))
 
     moe_fields = _extract_moe_fields(config)
+    mla_fields = _extract_mla_fields(config)
     head_dim = moe_fields["head_dim"]
+    if mla_fields and head_dim is None:
+        head_dim = mla_fields.get("v_head_dim")
 
     if moe_fields["num_experts"] > 0:
         transformer_params, avg_params_per_layer = _estimate_moe_model_params(
@@ -293,6 +359,7 @@ def load_model_spec(artifacts: ModelArtifacts) -> ModelSpec:
             moe_intermediate_size=moe_fields["moe_intermediate_size"],
             shared_expert_intermediate_size=moe_fields["shared_expert_intermediate_size"],
             first_k_dense_replace=moe_fields["first_k_dense_replace"],
+            mla_fields=mla_fields,
         )
     else:
         params_per_layer = _estimate_transformer_block_params(
@@ -335,5 +402,13 @@ def load_model_spec(artifacts: ModelArtifacts) -> ModelSpec:
         shared_expert_intermediate_size=moe_fields["shared_expert_intermediate_size"],
         first_k_dense_replace=moe_fields["first_k_dense_replace"],
         num_nextn_predict_layers=moe_fields["num_nextn_predict_layers"],
+        attention_bias=bool(config.get("attention_bias", False)),
+        moe_router_score_function=_detect_router_score_function(artifacts.model_dir),
+        use_mla=bool(mla_fields),
+        q_lora_rank=mla_fields.get("q_lora_rank"),
+        kv_lora_rank=mla_fields.get("kv_lora_rank"),
+        qk_nope_head_dim=mla_fields.get("qk_nope_head_dim"),
+        qk_rope_head_dim=mla_fields.get("qk_rope_head_dim"),
+        mla_v_head_dim=mla_fields.get("v_head_dim"),
     )
 

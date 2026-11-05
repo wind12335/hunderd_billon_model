@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from dataclasses import replace
 from typing import Callable
 
+from megatron_mvp.comm_model import estimate_communication
 from megatron_mvp.ppo_search import ControllerEvaluation
 from megatron_mvp.ppo_search import DecisionNode
 from megatron_mvp.ppo_search import run_rl_guided_ppo_search
@@ -300,14 +301,31 @@ def _estimate_transformer_component_params(spec: ModelSpec) -> dict[str, int]:
             if spec.hidden_size % spec.num_heads == 0
             else spec.hidden_size
         )
-    kv_hidden_size = spec.num_kv_heads * head_dim
-    q_hidden_size = spec.num_heads * head_dim
-    attention_params = (
-        spec.hidden_size * q_hidden_size
-        + spec.hidden_size * kv_hidden_size
-        + spec.hidden_size * kv_hidden_size
-        + q_hidden_size * spec.hidden_size
-    )
+    if spec.use_mla and spec.kv_lora_rank:
+        # MLA（KV 低秩压缩）attention：q 下采+上采（q_lora 为空则 q 直投）、
+        # kv 下采（kv_lora + rope 维）+ 上采（按 head 展开 nope/v）、o 投影。
+        nope_dim = spec.qk_nope_head_dim or head_dim
+        rope_dim = spec.qk_rope_head_dim or 0
+        v_dim = spec.mla_v_head_dim or nope_dim
+        kv_lora = spec.kv_lora_rank
+        if spec.q_lora_rank:
+            attention_params = spec.hidden_size * spec.q_lora_rank + spec.q_lora_rank * spec.num_heads * (nope_dim + rope_dim)
+        else:
+            attention_params = spec.hidden_size * spec.num_heads * (nope_dim + rope_dim)
+        attention_params += (
+            spec.hidden_size * (kv_lora + rope_dim)
+            + kv_lora * spec.num_heads * (nope_dim + v_dim)
+            + spec.num_heads * v_dim * spec.hidden_size
+        )
+    else:
+        kv_hidden_size = spec.num_kv_heads * head_dim
+        q_hidden_size = spec.num_heads * head_dim
+        attention_params = (
+            spec.hidden_size * q_hidden_size
+            + spec.hidden_size * kv_hidden_size
+            + spec.hidden_size * kv_hidden_size
+            + q_hidden_size * spec.hidden_size
+        )
     dense_mlp_params = spec.hidden_size * spec.intermediate_size * 3
 
     if spec.is_moe:
@@ -451,6 +469,17 @@ def _check_megatron_lowerability(
         embedding_policy=proposal.embedding_policy,
         lm_head_policy=proposal.lm_head_policy,
     )
+    # EP 可行性：EP 只细分 DP，必须整除 dp 与专家数（RL 自由组合时可能非法）。
+    ep = proposal.expert_parallel_size
+    if ep > 1:
+        if not spec.is_moe:
+            reasons.append("非 MoE 模型不支持 expert_parallel_size>1")
+        elif ep > proposal.mesh.dp_size:
+            reasons.append(f"ep={ep} 超过 dp={proposal.mesh.dp_size}")
+        elif proposal.mesh.dp_size % ep != 0:
+            reasons.append(f"dp={proposal.mesh.dp_size} 不能被 ep={ep} 整除")
+        elif spec.num_experts % ep != 0:
+            reasons.append(f"num_experts={spec.num_experts} 不能被 ep={ep} 整除")
     return len(reasons) == 0, reasons
 
 
@@ -478,6 +507,7 @@ def _estimate_memory(
 
     transformer_params_per_rank = 0
     activation_bytes = 0
+    moe_topk = max(int(spec.num_experts_per_tok or 1), 1)
     for group_name, dense_count, moe_count in group_specs:
         attn_policy = proposal.grouped_attention_policies()[group_name]
         mlp_policy = proposal.grouped_mlp_policies()[group_name]
@@ -512,6 +542,20 @@ def _estimate_memory(
             * _RECOMPUTE_RATIO
             / activation_factor
         )
+        # EP>1 时专家路由引入 all-to-all 派发/回收缓冲：每个 MoE 层的 token 按
+        # 路由 top-k 复制进出专家（进出各一份，约 2×），与 TP 共享激活分片因子。
+        if ep_size > 1 and moe_count:
+            activation_bytes += int(
+                moe_count
+                * micro_batch_size
+                * seq_length
+                * spec.hidden_size
+                * moe_topk
+                * 2
+                * _BYTES_PER_BF16
+                * _RECOMPUTE_RATIO
+                / activation_factor
+            )
 
     # PP 切分：每个 rank 只持有本 stage 的层（≈ num_layers/pp，向上取整偏保守）。
     layers_per_stage = math.ceil(spec.num_layers / pp_size)
@@ -623,6 +667,13 @@ def _candidate_score(candidate: SearchCandidate, policy: str) -> tuple[int, ...]
     negative_margin = -candidate.memory_margin_bytes
     negative_gbs = -candidate.global_batch_size
     embedding_rank = 0 if candidate.parallel_plan.embedding_policy == "vocab_shard" else 1
+    # 通信时间平局裁决（G2）：只在其它键全部打平时才起作用，毫秒粒度取整。
+    # 无估算（旧路径未计算）时为 0，保持与历史行为一致。
+    comm_rank = (
+        int(round(candidate.communication.total_seconds * 1000))
+        if candidate.communication is not None
+        else 0
+    )
 
     if normalized_policy == "MEMORY_FIRST":
         return (
@@ -634,7 +685,7 @@ def _candidate_score(candidate: SearchCandidate, policy: str) -> tuple[int, ...]
             negative_tp,
         )
     if normalized_policy == "THROUGHPUT_FIRST":
-        return (current_rank, device_gap, negative_gbs, world_size, negative_dp)
+        return (current_rank, device_gap, negative_gbs, world_size, negative_dp, comm_rank)
     if normalized_policy == "TP_FIRST":
         return (current_rank, device_gap, negative_tp, world_size, negative_dp)
     if normalized_policy == "DP_FIRST":
@@ -647,6 +698,7 @@ def _candidate_score(candidate: SearchCandidate, policy: str) -> tuple[int, ...]
         embedding_rank,
         negative_tp,
         negative_dp,
+        comm_rank,
     )
 
 
@@ -666,6 +718,10 @@ def _candidate_reward(candidate: SearchCandidate, policy: str) -> float:
     reward += candidate.memory_margin_bytes / float(8 * 1024**3)
     reward -= 0.5 * candidate.world_size
     reward += 0.25 * candidate.global_batch_size
+
+    # 通信代价惩罚（G2）：每步通信秒数直接扣减，封顶 8 分避免淹没显存项。
+    if candidate.communication is not None:
+        reward -= min(8.0, candidate.communication.total_seconds)
 
     if candidate.parallel_plan.sequence_parallel:
         reward += 2.0
@@ -734,6 +790,18 @@ def _evaluate_proposal(
             memory_margin_bytes=memory_margin_bytes,
             megatron_lowerable=megatron_lowerable,
         )
+        # 解析式通信估算（G2/G3）：随候选持久化，供排序平局裁决、奖励与 render。
+        communication = estimate_communication(
+            spec=spec,
+            env=env,
+            tp_size=proposal.mesh.tp_size,
+            dp_size=proposal.mesh.dp_size,
+            pp_size=proposal.mesh.pp_size,
+            ep_size=proposal.expert_parallel_size,
+            micro_batch_size=micro_batch_size,
+            seq_length=seq_length,
+            grads_bytes_per_rank=estimated_memory.grads_bytes,
+        )
         candidate = SearchCandidate(
             world_size=proposal.mesh.world_size,
             tp_size=proposal.mesh.tp_size,
@@ -747,24 +815,31 @@ def _evaluate_proposal(
             requires_additional_devices=max(0, proposal.mesh.world_size - env.device_count),
             parallel_plan=parallel_plan,
             score=(),
+            communication=communication,
         )
         candidates.append(replace(candidate, score=_candidate_score(candidate, policy)))
     return candidates, rejected_reasons
 
 
-def _select_ep_candidate(spec: ModelSpec, dp_size: int, max_ep: int) -> int:
-    """为 MoE 模型选择一个 EP 候选值。
+def _ep_candidates(spec: ModelSpec, dp_size: int, max_ep: int) -> list[int]:
+    """列出合法 EP 候选（降序）。
 
-    规则：在 1..min(max_ep, dp) 内，选择同时整除 dp 和 num_experts 的最大值。
-    返回 1 表示不启用 EP（或没有合法 EP 切分）。
+    规则：ep 必须同时整除 dp 和 num_experts，且 1 <= ep <= min(max_ep, dp)。
+    返回 [1] 表示不启用 EP（或没有合法 EP 切分）。
     """
     if not spec.is_moe or max_ep <= 1 or dp_size <= 1:
-        return 1
+        return [1]
     upper = min(int(max_ep), dp_size)
-    for ep_candidate in range(upper, 1, -1):
-        if dp_size % ep_candidate == 0 and spec.num_experts % ep_candidate == 0:
-            return ep_candidate
-    return 1
+    return [
+        ep for ep in range(upper, 0, -1)
+        if dp_size % ep == 0 and spec.num_experts % ep == 0
+    ]
+
+
+def _select_ep_candidate(spec: ModelSpec, dp_size: int, max_ep: int) -> int:
+    """兼容入口：只取最大合法 EP 值（1 表示不启用）。枚举全部候选用 _ep_candidates。"""
+    candidates = _ep_candidates(spec, dp_size, max_ep)
+    return candidates[0] if candidates else 1
 
 
 def _build_standard_tp_dp_proposal(
@@ -810,36 +885,19 @@ def _build_standard_proposals(
     meshes: list[MeshChoice],
     max_ep: int = 1,
 ) -> list[GroupedPolicyProposal]:
-    """构造标准 DP+TP(+PP+EP) 公共策略域的完整 proposal 集。"""
+    """构造标准 DP+TP(+PP+EP) 公共策略域的完整 proposal 集。
+
+    EP 是一等枚举维度：对每个 mesh 枚举全部合法 EP 候选（_ep_candidates），
+    而非只取最大值——搜索需要能比较 EP=4 与 EP=8 的显存/吞吐权衡。
+    稠密模型 EP 候选恒为 [1]，行为与旧版完全一致。
+    """
     proposals: list[GroupedPolicyProposal] = []
     for mesh in meshes:
-        if mesh.tp_size == 1:
-            proposals.append(_build_standard_tp_dp_proposal(spec=spec, mesh=mesh))
-            ep_candidate = _select_ep_candidate(spec, mesh.dp_size, max_ep)
-            if ep_candidate > 1:
-                proposals.append(
-                    _build_standard_tp_dp_proposal(
-                        spec=spec,
-                        mesh=mesh,
-                        expert_parallel_size=ep_candidate,
-                    )
-                )
-            continue
-
-        if spec.tie_word_embeddings:
-            proposals.append(_build_standard_tp_dp_proposal(spec=spec, mesh=mesh))
-            ep_candidate = _select_ep_candidate(spec, mesh.dp_size, max_ep)
-            if ep_candidate > 1:
-                proposals.append(
-                    _build_standard_tp_dp_proposal(
-                        spec=spec,
-                        mesh=mesh,
-                        expert_parallel_size=ep_candidate,
-                    )
-                )
-            continue
-
-        for embedding_policy in _EMBEDDING_POLICIES:
+        base_policies: list[str | None] = (
+            [None] if (mesh.tp_size == 1 or spec.tie_word_embeddings)
+            else list(_EMBEDDING_POLICIES)
+        )
+        for embedding_policy in base_policies:
             proposals.append(
                 _build_standard_tp_dp_proposal(
                     spec=spec,
@@ -847,14 +905,14 @@ def _build_standard_proposals(
                     embedding_policy=embedding_policy,
                 )
             )
-        ep_candidate = _select_ep_candidate(spec, mesh.dp_size, max_ep)
-        if ep_candidate > 1:
+        for ep in _ep_candidates(spec, mesh.dp_size, max_ep):
+            if ep <= 1:
+                continue
             proposals.append(
                 _build_standard_tp_dp_proposal(
                     spec=spec,
                     mesh=mesh,
-                    embedding_policy="vocab_shard",
-                    expert_parallel_size=ep_candidate,
+                    expert_parallel_size=ep,
                 )
             )
     return proposals
@@ -933,11 +991,27 @@ def _proposal_proxy_score(
     return reward
 
 
-def _build_decision_nodes(meshes: list[MeshChoice]) -> list[DecisionNode]:
-    """构造 PPO 的标准 DP+TP 决策节点。"""
+def _build_decision_nodes(
+    meshes: list[MeshChoice],
+    spec: ModelSpec | None = None,
+    max_ep: int = 1,
+) -> list[DecisionNode]:
+    """构造 PPO 的决策节点（mesh / embedding_policy / ep）。
+
+    MoE 模型把 EP 升为一等动作维度：候选取所有 mesh 合法 EP 候选的并集；
+    非法组合（如 ep 超过该 mesh 的 dp）由 _check_megatron_lowerability 拒绝
+    并体现在奖励惩罚里，控制器据此学会避开。
+    """
     decision_nodes = [DecisionNode("mesh", tuple(mesh.label() for mesh in meshes))]
     if any(mesh.tp_size > 1 for mesh in meshes):
         decision_nodes.append(DecisionNode("embedding_policy", _EMBEDDING_POLICIES))
+    if spec is not None and spec.is_moe and max_ep > 1:
+        ep_choices: set[int] = set()
+        for mesh in meshes:
+            ep_choices.update(_ep_candidates(spec, mesh.dp_size, max_ep))
+        labels = tuple(str(ep) for ep in sorted(ep_choices, reverse=True))
+        if len(labels) > 1:
+            decision_nodes.append(DecisionNode("ep", labels))
     return decision_nodes
 
 
@@ -946,11 +1020,12 @@ def _build_proposal_from_assignment(
     assignment: dict[str, str],
     mesh_lookup: dict[str, MeshChoice],
 ) -> GroupedPolicyProposal:
-    """根据 PPO assignment 构造标准 DP+TP 提案。"""
+    """根据 PPO assignment 构造标准 DP+TP(+EP) 提案。"""
     return _build_standard_tp_dp_proposal(
         spec=spec,
         mesh=mesh_lookup[assignment["mesh"]],
         embedding_policy=assignment.get("embedding_policy"),
+        expert_parallel_size=int(assignment.get("ep", 1) or 1),
     )
 
 
@@ -961,6 +1036,8 @@ def _proposal_to_assignment(proposal: GroupedPolicyProposal) -> dict[str, str]:
     }
     if proposal.mesh.tp_size > 1:
         assignment["embedding_policy"] = proposal.embedding_policy
+    if proposal.expert_parallel_size > 1:
+        assignment["ep"] = str(proposal.expert_parallel_size)
     return assignment
 
 
@@ -1104,7 +1181,7 @@ def _rl_guided_ppo_strategy(
         return [], [], ["没有任何合法 mesh，无法继续 RL_GUIDED_PPO 搜索。"]
 
     mesh_lookup = {mesh.label(): mesh for mesh in meshes}
-    decision_nodes = _build_decision_nodes(meshes)
+    decision_nodes = _build_decision_nodes(meshes, spec=spec, max_ep=max_ep)
     standard_proposals = _build_standard_proposals(spec=spec, meshes=meshes, max_ep=max_ep)
     seed_assignments = [
         _proposal_to_assignment(proposal)
