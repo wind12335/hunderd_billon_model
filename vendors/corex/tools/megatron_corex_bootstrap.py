@@ -60,6 +60,57 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _try_fetch_upstream(target: Path) -> bool:
+    """目录缺失时自动拉取上游 core_v0.14.0rc2 干净源码（网络可达时）。
+
+    内网隔离的作业机通常不通公网，拉取失败不算错误——返回 False，交由
+    调用方按原报错指引人工放置源码包。多 rank 并发启动 bootstrap 时用
+    文件锁串行化：先到的 rank 完成 clone，其余直接命中。设
+    MEGATRON_AUTO_FETCH=0 可关闭自动拉取。
+    """
+    if os.environ.get("MEGATRON_AUTO_FETCH", "1").strip() == "0":
+        return False
+    import subprocess
+    import fcntl
+
+    if (target / "megatron").is_dir():
+        return True
+    target.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = target.parent / ".megatron_fetch.lock"
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            if (target / "megatron").is_dir():  # 并发的 rank 已拉好
+                return True
+            print(
+                f"[megatron_corex_bootstrap] 未找到上游源码，"
+                f"尝试自动拉取 core_v0.14.0rc2 → {target}"
+            )
+            # tag 双保险：上游历史 tag 存在 core_v / core_r 两种前缀命名。
+            last_err = ""
+            for tag in ("core_v0.14.0rc2", "core_r0.14.0rc2"):
+                proc = subprocess.run(
+                    ["git", "clone", "--branch", tag, "--depth", "1",
+                     "https://github.com/NVIDIA/Megatron-LM.git", str(target)],
+                    capture_output=True, text=True, timeout=600,
+                )
+                if proc.returncode == 0 and (target / "megatron").is_dir():
+                    print(f"[megatron_corex_bootstrap] 自动拉取成功 (tag={tag})")
+                    return True
+                last_err = (proc.stderr or "").strip()[-200:]
+                # 失败时 git 可能留下半截目录，清掉再试下一个 tag。
+                if target.exists():
+                    import shutil
+                    shutil.rmtree(target, ignore_errors=True)
+            print(
+                "[megatron_corex_bootstrap] 自动拉取失败(内网作业机属正常现象)，"
+                f"请人工放置源码包后重试。git 尾部输出: {last_err}"
+            )
+            return False
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
 def _upstream_root() -> Path:
     """返回上游 Megatron-LM 源码目录（上游干净源码 core_v0.14.0rc2）。"""
     env_root = os.environ.get("MEGATRON_UPSTREAM_ROOT")
@@ -72,9 +123,15 @@ def _upstream_root() -> Path:
     for candidate in candidates:
         if (candidate / "megatron").is_dir():
             return candidate
+    # 候选都不在位：网络可达时自动拉上游干净源码到仓库内挂载点，
+    # bootstrap 后续的 6 处幂等补丁会把它配成 CoreX 可用状态。
+    if _try_fetch_upstream(_repo_root() / "Megatron-LM"):
+        return _repo_root() / "Megatron-LM"
     raise FileNotFoundError(
         "未找到上游 Megatron-LM 源码目录。请设置环境变量 MEGATRON_UPSTREAM_ROOT "
-        "指向 Megatron-LM 源码(容器内通常为仓库内 Megatron-LM/)。"
+        "指向 Megatron-LM 源码(容器内通常为仓库内 Megatron-LM/)；"
+        "或把上游 core_v0.14.0rc2 干净源码放到 "
+        f"{_repo_root() / 'Megatron-LM'}。"
     )
 
 

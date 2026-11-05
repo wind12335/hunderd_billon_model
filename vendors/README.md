@@ -48,10 +48,14 @@ python3 tools/regress_vendor.py vendors   # 例：按 8×S5000-80G 替身规划
 
 Megatron 源码获取（activate/bootstrap 按 `${本目录}/Megatron-LM` 挂载，不入库）：
 
-- maca：沐曦官方 Maca-Megatron-LM 0.12 源码包（bootstrap 原样挂载、不改源码）；
-- musa：上游 Megatron-LM 0.14.0rc2 干净源码（bootstrap 施加 7 处幂等源码补丁，
-  运行期由 `import musa_patch` 兜底转译）；
-- corex：上游 Megatron-LM 0.14.0rc2 干净源码（bootstrap 施加 6 处幂等补丁）。
+- musa / corex：**网络可达时自动拉取**——目录不在位则 bootstrap 自动
+  `git clone` 上游 `core_v0.14.0rc2` 干净源码（musa 施加 7 处幂等源码补丁＋
+  `import musa_patch` 运行期转译；corex 施加 6 处幂等补丁），随后每次启动
+  幂等跳过。内网作业机拉取失败不报错，回落人工放置；`MEGATRON_AUTO_FETCH=0`
+  可关闭。多 rank 并发启动由文件锁串行化；
+- maca：沐曦官方 maca-megatron-lm 0.12 源码包（bootstrap 原样挂载、不改
+  源码）。**厂商私有分发、公网没有，只能人工放置**到 `vendors/maca/Megatron-LM`；
+- hygon：内部 Megatron-LM-das 仓库（作业机在位），activate 三级解析。
 
 ## 已知坑（详见各家 README）
 
