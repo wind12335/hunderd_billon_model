@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from megatron_mvp.comm_model import estimate_step_seconds
+from megatron_mvp.vendor_profile import current_profile
 from megatron_mvp.types import CoarseIR
 from megatron_mvp.types import GenerationOutputs
 from megatron_mvp.types import ModelArtifacts
@@ -140,7 +141,10 @@ def build_coarse_ir(
             "pp_size": plan.pp,
             "expert_model_parallel_size": plan.ep,
             "world_size": plan.world_size,
-            "sequence_parallel": plan.sequence_parallel,
+            "sequence_parallel": bool(
+                plan.sequence_parallel
+                and current_profile(env.accelerator_type).allow_sequence_parallel
+            ),
         },
         parallel_plan=plan.to_dict(),
         train={
@@ -156,6 +160,7 @@ def build_coarse_ir(
             "device_name": env.primary_device_name,
             "device_memory_bytes": env.primary_device_memory_bytes,
             "accelerator_type": env.accelerator_type,
+            "vendor_profile": current_profile(env.accelerator_type).key,
             "hip_version": env.hip_version,
         },
         search={
@@ -207,6 +212,7 @@ def build_megatron_config(ir: CoarseIR) -> dict[str, object]:
     train = ir.train
     parallelism = ir.parallelism
     parallel_plan = ir.parallel_plan
+    profile = current_profile(ir.environment.get("accelerator_type"))
 
     model_args: dict[str, object] = {
         "use_mcore_models": True,
@@ -223,6 +229,10 @@ def build_megatron_config(ir: CoarseIR) -> dict[str, object]:
         "disable_bias_linear": True,
         "rotary_base": int(model["rope_theta"]),
     }
+    # 厂商能力位：无厂商版 TransformerEngine 的档位（摩尔/天数）固定 local
+    # 实现（权重结构与转换脚本一致）；海光 dcu_megatron 参数体系无此旗标不渲染。
+    if profile.fixed_transformer_impl:
+        model_args["transformer_impl"] = profile.fixed_transformer_impl
     # GQA 模型（num_kv_heads < num_heads）需要显式 num_query_groups；
     # MLA 模型没有 GQA（引擎断言两者互斥），且头维由 MLA 维度标志给出。
     if not model.get("use_mla"):
@@ -256,7 +266,9 @@ def build_megatron_config(ir: CoarseIR) -> dict[str, object]:
     parallelism_args: dict[str, object] = {
         "tensor_model_parallel_size": parallelism["tp_size"],
         "pipeline_model_parallel_size": parallelism["pp_size"],
-        "sequence_parallel": parallelism["sequence_parallel"],
+        "sequence_parallel": bool(
+            parallelism["sequence_parallel"] and profile.allow_sequence_parallel
+        ),
     }
     if int(parallelism.get("expert_model_parallel_size", 1)) > 1:
         parallelism_args["expert_model_parallel_size"] = parallelism[
@@ -389,7 +401,8 @@ def build_launch_script(
     master_addr: str | None = None,
     master_port: int | None = None,
 ) -> str:
-    """生成海光版启动脚本模板（多机感知）。"""
+    """生成 Megatron 启动脚本模板（多机感知；厂商档见 vendor_profile）。"""
+    profile = current_profile(ir.environment.get("accelerator_type"))
     parallelism = ir.parallelism
     parallel_plan = ir.parallel_plan
     model_args = _render_flag_block(megatron_config["model_args"])
@@ -438,7 +451,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../.." && pwd)"
 cd "${{ROOT_DIR}}"
 
-source "${{ROOT_DIR}}/scripts/activate_megatron_hygon.sh"
+source "${{ROOT_DIR}}/{profile.activate_script}"
 
 export CUDA_DEVICE_MAX_CONNECTIONS="${{CUDA_DEVICE_MAX_CONNECTIONS:-1}}"
 export TORCH_COMPILE_DISABLE="${{TORCH_COMPILE_DISABLE:-1}}"
@@ -477,7 +490,7 @@ python3 -m torch.distributed.run \
     --master_addr "${{MASTER_ADDR}}" \
     --master_port "${{MASTER_PORT}}" \
     --rdzv-conf "timeout=${{RDZV_TIMEOUT:-2400}}" \
-    "${{ROOT_DIR}}/tools/run_megatron_hygon.py" Megatron-LM/pretrain_gpt.py \
+    "${{ROOT_DIR}}/{profile.run_wrapper}" Megatron-LM/pretrain_gpt.py \
     --rank "${{RANK:-0}}" \
     --world-size "${{WORLD_SIZE}}" \
     --dist-url "tcp://${{MASTER_ADDR}}:${{MASTER_PORT}}" \

@@ -8,10 +8,11 @@ import torch
 
 from megatron_mvp.types import DeviceInfo
 from megatron_mvp.types import RuntimeEnvironment
+from megatron_mvp.vendor_profile import current_profile
 
-# 无 GPU 开发机做纯规划(cross-compile)时的单卡替身规格，与集群 BW1000 对齐
-_STANDIN_DEVICE_NAME = "BW1000-64G-planning-standin"
-_STANDIN_DEVICE_MEMORY_BYTES = 64 * 1024**3
+# 无 GPU 开发机做纯规划(cross-compile)时的单卡替身规格：默认与集群 BW1000
+# 对齐；设 AUTOPLAN_VENDOR=<maca|musa|corex> 时切到对应厂商卡替身规格
+# （见 megatron_mvp/vendor_profile.py）。
 
 
 def _topology_overrides() -> dict[str, float | int]:
@@ -45,13 +46,16 @@ def _topology_overrides() -> dict[str, float | int]:
 
 
 def detect_runtime_environment() -> RuntimeEnvironment:
-    """检测当前海光/ROCm 运行环境。
+    """检测运行环境（海光 ROCm／沐曦 MACA／摩尔 MUSA／天数 CoreX／通用 CUDA）。
 
     无 GPU/DCU 的机器（开发机）默认报错；设置环境变量
     AUTOPLAN_STANDIN_GPUS=<卡数> 可返回伪造的 BW1000 替身环境，
     专供 cross-compile 规划用（真实 LAUNCH 在集群上执行，那里不设此变量、
     走真卡检测，不受影响）。替身显式设置时优先于真卡检测——开发机即使
     偶尔挂了 1 张真卡，规划视角也以替身卡数为准。
+
+    设 AUTOPLAN_VENDOR=<maca|musa|corex> 可把替身卡规格与厂商档决策一并
+    切换（缺省海光 BW1000），供跨厂商纯规划。
 
     拓扑字段（G3）统一由 _topology_overrides 从环境变量覆盖，默认值是
     与 BW1000 每节点 8 卡对齐的保守占位，待集群实测校准。
@@ -60,21 +64,22 @@ def detect_runtime_environment() -> RuntimeEnvironment:
     standin_count = os.environ.get("AUTOPLAN_STANDIN_GPUS", "").strip()
     if standin_count:
         count = max(1, int(standin_count))
+        profile = current_profile()  # AUTOPLAN_VENDOR 优先，缺省海光 BW1000
         devices = [
             DeviceInfo(
                 index=index,
-                name=_STANDIN_DEVICE_NAME,
-                total_memory_bytes=_STANDIN_DEVICE_MEMORY_BYTES,
+                name=profile.standin_device_name,
+                total_memory_bytes=profile.standin_memory_bytes,
                 multi_processor_count=None,
             )
             for index in range(count)
         ]
         return RuntimeEnvironment(
-            accelerator_type="hip",
+            accelerator_type=profile.accelerator_types[0],
             device_count=count,
             devices=devices,
-            primary_device_name=_STANDIN_DEVICE_NAME,
-            primary_device_memory_bytes=_STANDIN_DEVICE_MEMORY_BYTES,
+            primary_device_name=profile.standin_device_name,
+            primary_device_memory_bytes=profile.standin_memory_bytes,
             torch_version=str(torch.__version__),
             hip_version=getattr(torch.version, "hip", None),
             **topology,
@@ -95,8 +100,23 @@ def detect_runtime_environment() -> RuntimeEnvironment:
         )
 
     primary_device = devices[0]
+    # 多厂商探测：天数按设备名/构建串、摩尔按 torch.musa 可用性识别；沐曦走
+    # cu-bridge 兼容层（torch.cuda 可用）只能靠版本串 "+metax" 识别；其余回落
+    # 海光 ROCm（hip）或通用 cuda。档位映射见 vendor_profile.pick_profile。
+    device_name = primary_device.name
+    torch_build = str(torch.__version__)
+    if "Iluvatar" in device_name or "+corex" in torch_build:
+        detected_type = "corex"
+    elif getattr(torch, "musa", None) is not None and torch.musa.is_available():
+        detected_type = "musa"
+    elif "+metax" in torch_build:
+        detected_type = "maca"
+    elif getattr(torch.version, "hip", None):
+        detected_type = "hip"
+    else:
+        detected_type = "cuda"
     return RuntimeEnvironment(
-        accelerator_type="hip" if getattr(torch.version, "hip", None) else "cuda",
+        accelerator_type=detected_type,
         device_count=len(devices),
         devices=devices,
         primary_device_name=primary_device.name,

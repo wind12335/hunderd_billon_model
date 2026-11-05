@@ -9,6 +9,7 @@ from dataclasses import replace
 from typing import Callable
 
 from megatron_mvp.comm_model import estimate_communication
+from megatron_mvp.vendor_profile import current_profile
 from megatron_mvp.ppo_search import ControllerEvaluation
 from megatron_mvp.ppo_search import DecisionNode
 from megatron_mvp.ppo_search import run_rl_guided_ppo_search
@@ -459,6 +460,7 @@ def validate_standard_parallel_plan(
 def _check_megatron_lowerability(
     spec: ModelSpec,
     proposal: GroupedPolicyProposal,
+    allow_ep: bool = True,
 ) -> tuple[bool, list[str]]:
     """检查提案是否落在当前标准 DP+TP 公共策略域。"""
     reasons = _common_parallel_reasons(
@@ -472,7 +474,9 @@ def _check_megatron_lowerability(
     # EP 可行性：EP 只细分 DP，必须整除 dp 与专家数（RL 自由组合时可能非法）。
     ep = proposal.expert_parallel_size
     if ep > 1:
-        if not spec.is_moe:
+        if not allow_ep:
+            reasons.append("当前厂商档暂不支持专家并行(EP)——千亿 MoE 线当前仅海光档")
+        elif not spec.is_moe:
             reasons.append("非 MoE 模型不支持 expert_parallel_size>1")
         elif ep > proposal.mesh.dp_size:
             reasons.append(f"ep={ep} 超过 dp={proposal.mesh.dp_size}")
@@ -610,11 +614,16 @@ def _build_parallel_plan(
         if proposal.mesh.world_size <= env.device_count
         else "future_scalable"
     )
+    # 厂商能力位：无厂商版 TransformerEngine、走 local 实现的厂商（摩尔/天数）
+    # torch LayerNorm 不支持 sequence parallel，规划阶段直接关闭（多厂商合并
+    # 2026-11 起，见 megatron_mvp/vendor_profile.py）。
+    allow_sp = current_profile(env.accelerator_type).allow_sequence_parallel
     sequence_parallel = (
         proposal.mesh.tp_size > 1
         and megatron_lowerable
         and proposal.attn_policy_mid == "head_shard"
         and proposal.mlp_policy_mid == "colrow_shard"
+        and allow_sp
     )
     return ParallelPlan(
         model_path=spec.model_dir,
@@ -758,6 +767,7 @@ def _evaluate_proposal(
     megatron_lowerable, lowerability_reasons = _check_megatron_lowerability(
         spec=spec,
         proposal=proposal,
+        allow_ep=current_profile(env.accelerator_type).supports_ep_moe,
     )
     if not megatron_lowerable:
         return [], [
@@ -956,7 +966,11 @@ def _proposal_proxy_score(
     policy: str,
 ) -> float:
     """构造 Hierarchical 第一阶段的粗评分。"""
-    megatron_lowerable, lowerability_reasons = _check_megatron_lowerability(spec, proposal)
+    megatron_lowerable, lowerability_reasons = _check_megatron_lowerability(
+        spec,
+        proposal,
+        allow_ep=current_profile(env.accelerator_type).supports_ep_moe,
+    )
     reward = 0.0
     if megatron_lowerable:
         reward += 30.0
@@ -1065,7 +1079,11 @@ def _evaluate_assignment_for_ppo(
     all_candidates = feasible_current + feasible_future
 
     reward = -_proposal_structural_penalty(proposal)
-    megatron_lowerable, lowerability_reasons = _check_megatron_lowerability(spec, proposal)
+    megatron_lowerable, lowerability_reasons = _check_megatron_lowerability(
+        spec,
+        proposal,
+        allow_ep=current_profile(env.accelerator_type).supports_ep_moe,
+    )
     if megatron_lowerable:
         reward += 35.0
     else:

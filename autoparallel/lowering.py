@@ -10,6 +10,7 @@ from typing import Any
 from autoparallel.config import Config
 from autoparallel.types import AutoParallelPlan
 from autoparallel.types import LoweredProgram
+from megatron_mvp.vendor_profile import current_profile
 
 
 def _flag(name: str) -> str:
@@ -248,6 +249,9 @@ def _build_launch_script(
     training_args = _render_flag_block(megatron_config["training_args"])
     data_args = _render_array_block(megatron_config["data_args"])
     runtime_args = _render_flag_block(megatron_config["runtime_args"])
+    # 厂商档（多厂商自动检测）：按规划时记录的 accelerator_type 选择激活脚本
+    # 与运行包装器；AUTOPLAN_VENDOR 显式覆盖优先（跨厂商纯规划场景）。
+    profile = current_profile(plan.runtime_summary.get("accelerator_type"))
     data_cache_path = config.resolved_data_cache_path()
 
     num_nodes = config.resolved_num_nodes()
@@ -285,7 +289,7 @@ set -euo pipefail
 ROOT_DIR="{project_root}"
 cd "${{ROOT_DIR}}"
 
-source "${{ROOT_DIR}}/scripts/activate_megatron_hygon.sh"
+source "${{ROOT_DIR}}/{profile.activate_script}"
 
 export AUTOPARALLEL_ROLE="{script_role}"
 export CUDA_DEVICE_MAX_CONNECTIONS="${{CUDA_DEVICE_MAX_CONNECTIONS:-1}}"
@@ -315,7 +319,7 @@ python3 -m torch.distributed.run \
     --master_addr "${{MASTER_ADDR}}" \
     --master_port "${{MASTER_PORT}}" \
     --rdzv-conf "timeout=${{RDZV_TIMEOUT:-2400}}" \
-    "${{ROOT_DIR}}/tools/run_megatron_hygon.py" {config.entrypoint} \
+    "${{ROOT_DIR}}/{profile.run_wrapper}" {config.entrypoint} \
     --rank "${{RANK:-0}}" \
     --world-size "${{WORLD_SIZE}}" \
     --dist-url "tcp://${{MASTER_ADDR}}:${{MASTER_PORT}}" \
@@ -330,6 +334,10 @@ python3 -m torch.distributed.run \
 
 def _build_manual_example(config: Config, plan: AutoParallelPlan) -> str:
     """构建手动显式 PP/TP 并行参考代码。"""
+    profile = current_profile(plan.runtime_summary.get("accelerator_type"))
+    backend_import = (
+        f"{profile.backend_import_line}\n" if profile.backend_import_line else ""
+    )
     return f'''"""手动显式并行实现示例。
 
 这个文件故意保留大量并行细节，作为和声明式 autoparallel 的对照基线。
@@ -339,7 +347,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-
+{backend_import}
 
 TP_SIZE = {plan.parallel_spec.tp_size}
 PP_SIZE = max({plan.parallel_spec.pp_size}, 1)
@@ -463,7 +471,7 @@ class LlamaModel(nn.Module):
         self.config = config
         self.pp_info = pp_info
         self.tp_info = tp_info
-        self.device_tp = torch.device("cuda:0")
+        self.device_tp = torch.device("{profile.device_prefix}:0")
         self.tp_group = object()
         self.pp_first_stage = get_pp_rank() == 0
         self.pp_last_stage = get_pp_rank() == len(pp_info["num_layers"]) - 1
@@ -521,7 +529,7 @@ def train_step() -> None:
     model = LlamaModel(config=config, pp_info=pp_info, tp_info=tp_info)
     optimizer = build_optimizer(model)
 
-    input_ids = torch.randint(0, VOCAB_SIZE, (1, SEQ_LENGTH), device=torch.device("cuda:0"))
+    input_ids = torch.randint(0, VOCAB_SIZE, (1, SEQ_LENGTH), device=torch.device("{profile.device_prefix}:0"))
     logits = model(input_ids)
     loss = logits.float().mean()
     loss.backward()
@@ -900,7 +908,7 @@ set -euo pipefail
 ROOT_DIR="{project_root}"
 cd "${{ROOT_DIR}}"
 
-source "${{ROOT_DIR}}/scripts/activate_megatron_hygon.sh"
+source "${{ROOT_DIR}}/{profile.activate_script}"
 
 export AUTOPARALLEL_ROLE="{script_role}"
 export MASTER_ADDR="${{MASTER_ADDR:-{default_master_addr}}}"
@@ -938,7 +946,7 @@ set -euo pipefail
 ROOT_DIR="{project_root}"
 cd "${{ROOT_DIR}}"
 
-source "${{ROOT_DIR}}/scripts/activate_megatron_hygon.sh"
+source "${{ROOT_DIR}}/{profile.activate_script}"
 
 python3 "${{ROOT_DIR}}/tools/run_pytorch_llama_tp_dp.py" \
     --config "{runtime_config_path}" \
